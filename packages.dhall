@@ -126,6 +126,17 @@ let overrides = {=}
 let additions =
   { geometry-utils = ../purescript-geometry-utils/spago.dhall as Location
   , seegee = ../seegee/spago.dhall as Location
+  , matryoshka =
+    { dependencies =
+        [ "fixed-points"
+        , "free"
+        , "prelude"
+        , "profunctor"
+        , "transformers"
+        ]
+    , repo = "https://github.com/slamdata/purescript-matryoshka.git"
+    , version = "v0.4.0"
+    }
   }
 
 in  upstream // overrides // additions

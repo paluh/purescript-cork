@@ -1,0 +1,94 @@
+module Cork.Sprites.App.Algebras where
+
+-- import Prelude
+
+-- import Cork.Graphics.Canvas.ImageData.Immutable (fromHTMLLoadedImageElement') as ImageData.Immutable
+-- import Cork.Graphics.Canvas.ImageData.Mutable (thaw, unsafeFreeze) as ImageData.Mutable
+-- import Cork.Graphics.Canvas.ImageData.Mutable.Filters.Grayscale (filter) as Grayscale
+-- import Cork.Sprites.Sprite (SpriteF)
+-- import Cork.Sprites.Sprite.Filters (GrayscaleF(..), StackedBlurF(..), _grayscale, _stackedBlur)
+-- import Cork.Sprites.Sprite.Images (ExternalImageF(..), _externalImage)
+-- import Cork.Web.HTML.HTMLLoadedImageElement (new) as HTMLLoadedImageElement
+-- import Data.Functor.Variant (case_, on)
+-- import Data.Map (singleton) as Map
+-- import Data.Tuple (Tuple(..))
+-- import Effect.Class (liftEffect)
+-- import Graphics.Canvas (ImageData)
+-- import Matryoshka (Algebra)
+
+-- type ImageDataAlgCtx extra = { cache ∷ Cache, workspace ∷ CanvasElement | extra }
+-- type ImageDataAlgM ctx a = ExceptT Cache.ProcessingError (Reader (ImageDataAlgCtx ctx)) a
+-- 
+-- data ImageDataResult
+--   = ImageData ImageData
+--   | Generating
+--   | GenerateImageData Cache.Hash (Aff ImageData)
+--   | GenerateImageBitmap Cache.Hash (Aff ImageBitmap)
+
+-- imageDataBuildPlanAlg ∷ Algebra SpriteF ((ImageData → Cache.Machine.Plan) → Cache.Machine.Plan)
+-- imageDataBuildPlanAlg = case_
+--   # on _stackedBlur (\(StackedBlurF { hash, radius } build) cont →
+--     let
+--       process imageData = liftEffect $ do
+--         mutable ← ImageData.Mutable.thaw imageData
+--         Grayscale.filter mutable
+--         ImageData.Mutable.unsafeFreeze mutable
+--     in
+--       build (step hash process cont))
+--   # on _grayscale (\(GrayscaleF hash build) →
+--     let
+--       process imageData = liftEffect $ do
+--         mutable ← ImageData.Mutable.thaw imageData
+--         Grayscale.filter mutable
+--         ImageData.Mutable.unsafeFreeze mutable
+--     in
+--       \cont → build (step hash process cont))
+--   # on _externalImage (\(ExternalImageF { hash, url }) →
+--     let
+--       process = do
+--         img ← HTMLLoadedImageElement.new url
+--         liftEffect $ ImageData.Immutable.fromHTMLLoadedImageElement' img
+--     in
+--       \cont → BuildPlan (Map.singleton hash (Tuple process cont)))
+--   where
+--     step hash process cont = \imageData → BuildPlan (Map.singleton hash (Tuple (process imageData) cont))
+-- 
+
+
+-- | XXX: We should probably return a "plan" from here
+-- | And not recalcultate this over and over again.
+-- imageDataAlg ∷ ∀ ctx. AlgebraM (ImageDataAlgM ctx) SpriteF ImageDataResult
+-- imageDataAlg = case_
+--   -- | Fix blur
+--   # on _stackedBlur (\(StackedBlurF { hash, radius } imageData) →
+--     lift (asks _.cache.imageData) >>= Map.lookup hash >>> case _ of
+--       Just Cache.Generating → pure Generating
+--       Just (Cache.Generated imageData) → pure $ ImageData imageData
+--       Just (Cache.Failed err) → throwError err
+--       Nothing → pure $ GenerateImageData hash $ liftEffect $ do
+--         mutable ← ImageData.Mutable.thaw imageData
+--         Grayscale.filter mutable
+--         ImageData.Mutable.unsafeFreeze mutable)
+--   # on _grayscale (\(GrayscaleF hash imageData) →
+--     lift (asks _.cache.imageData) >>= Map.lookup hash >>> case _ of
+--       Just Cache.Generating → pure Generating
+--       Just (Cache.Generated imageData) → pure $ ImageData imageData
+--       Just (Cache.Failed err) → throwError err
+--       Nothing → pure $ GenerateImageData hash $ liftEffect $ do
+--         mutable ← ImageData.Mutable.thaw imageData
+--         Grayscale.filter mutable
+--         ImageData.Mutable.unsafeFreeze mutable)
+--   # on _externalImage (\(ExternalImageF { hash, url }) →
+--     lift (asks _.cache.imageData) >>= Map.lookup hash >>> case _ of
+--       Just Cache.Generating → pure Generating
+--       Just (Cache.Generated imageData) → pure $ ImageData imageData
+--       Just (Cache.Failed err) → throwError err
+--       Nothing → lift (asks _.cache.imageBitmap) >>= Map.lookup hash >>> case _ of
+--         Just Cache.Generating → pure Generating
+--         Just (Cache.Failed err) → throwError err
+--         Just (Cache.Generated imageBitmap) → do
+--           workspace ← lift (asks _.workspace)
+--           pure $ GenerateImageData hash $ liftEffect $ do
+--             ImageBitmap.toImageData workspace imageBitmap
+--         Nothing → pure $ GenerateImageBitmap hash $ ImageBitmap.fromSource url)
+

@@ -1,4 +1,4 @@
-module Cork.Sprites.Cache.Types where
+module Cork.Sprites.Caches.Types where
 
 import Cork.Graphics.Canvas.ImageBitmap (ImageBitmap)
 import Data.Lens (Lens')

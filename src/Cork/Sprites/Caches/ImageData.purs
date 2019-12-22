@@ -1,4 +1,4 @@
-module Cork.Sprites.Cache.Machine where
+module Cork.Sprites.Caches.ImageData where
 
 import Prelude
 
@@ -9,12 +9,13 @@ import Cork.Data.Array.Builder (build, cons) as Array.Builder
 import Cork.Graphics.Canvas.ImageData.Immutable (fromHTMLLoadedImageElement') as ImageData.Immutable
 import Cork.Graphics.Canvas.ImageData.Mutable (thaw, unsafeFreeze) as ImageData.Mutable
 import Cork.Graphics.Canvas.ImageData.Mutable.Filters.Grayscale (filter) as Grayscale
-import Cork.Machines.SelfFeeding (Machine) as SelfFeeding
-import Cork.Sprites.Cache (Item(..))
-import Cork.Sprites.Cache.Machine.Plan (Plan, layerFoldMapWithIndex, plan)
-import Cork.Sprites.Cache.Machine.Plan (step) as Plan
-import Cork.Sprites.Cache.Types (Cache, Hash, Item)
-import Cork.Sprites.Cache.Types (Hash) as Types
+import Cork.Machines.SelfFeeding (Machine, Update, make) as SelfFeeding
+import Cork.Sprites.Caches (Item) as Caches
+import Cork.Sprites.Caches (Item(..))
+import Cork.Sprites.Caches.ImageData.Plan (Plan, layerFoldMapWithIndex, plan)
+import Cork.Sprites.Caches.ImageData.Plan (step) as Plan
+import Cork.Sprites.Caches.Types (Cache, Hash, Item)
+import Cork.Sprites.Caches.Types (Hash) as Types
 import Cork.Sprites.Sprite (Sprite, SpriteF)
 import Cork.Sprites.Sprite.Filters (GrayscaleF(..), StackedBlurF(..), _grayscale, _stackedBlur)
 import Cork.Sprites.Sprite.Images (ExternalImageF(..), _externalImage)
@@ -26,13 +27,15 @@ import Data.Map (insert, lookup, singleton) as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Debug.Trace (traceM)
+import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (log)
 import Global.Unsafe (unsafeStringify)
 import Graphics.Canvas (ImageData)
 import Matryoshka (Algebra, cata)
 import Spork.Batch (batch)
+import Spork.Interpreter (basicAff)
+import Spork.Interpreter (merge, never) as Interpreter
 
 type ImageDataPlan = Plan Aff Types.Hash (Item ImageData)
 
@@ -97,6 +100,9 @@ type Model =
   , plan ∷ ImageDataCachingPlan
   }
 
+type Machine = SelfFeeding.Machine Aff Array Model Action
+
+update ∷ SelfFeeding.Update Aff Model Action
 update model = case _ of
   Load sprites →
     let
@@ -130,10 +136,26 @@ update model = case _ of
       in
         batch $ Array.Builder.build (layerFoldMapWithIndex step plan)
 
-machine ∷ _ → SelfFeeding.Machine _ _ _ _
-machine sprites =
-  { update
-  , subs: const $ mempty
-  , init: { model: mempty, effects: pure (Load sprites) }
+type Change = { new ∷ { hash ∷ Hash, item ∷ Caches.Item ImageData }, cache ∷ Cache ImageData }
+
+machine ∷ Effect
+  { process ∷ Array Sprite → Effect Unit
+  , subscribe ∷ (Change → Effect Unit) → Effect (Effect Unit)
   }
+machine = do
+  i ← SelfFeeding.make
+    (basicAff  (const $ pure unit) `Interpreter.merge` Interpreter.never)
+    { update
+    , subs: const $ mempty
+    , init: mempty
+    }
+  let
+    subscribe handler = i.subscribe case _ of
+      { action: CacheImageData hash item, new: new } -> handler { new: { hash, item }, cache: new.cache }
+      _ → pure unit
+    process sprites = do
+      i.push (Load sprites)
+      i.run
+
+  pure { process, subscribe }
 

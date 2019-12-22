@@ -14,13 +14,15 @@ import Spork.EventQueue as EventQueue
 import Spork.Interpreter (Interpreter(..))
 import Spork.Transition (Transition)
 
+type Update effects model action = model → action → Transition effects model action
+
 -- | A specification for a Spork app:
 -- |    * `render` - Renders a model to `Cork.Render.Render`
 -- |    * `update` - Takes the current model and, with a new action, transitions to a new model while optionally running effects.
 -- |    * `subs` - Determines the set of active subscriptions based on the model.
 -- |    * `init` - Initial model and effects to kickstart the application.
 type Machine effects subs model action =
-  { update ∷ model → action → Transition effects model action
+  { update ∷ Update effects model action
   , subs ∷ model → Batch subs action
   , init ∷ Transition effects model action
   }

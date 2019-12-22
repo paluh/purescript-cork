@@ -3,7 +3,7 @@ module Cork.Sprites.Sprite where
 import Prelude
 
 import Cork.Data.Functor.Variant.Mu (MuVariantF)
-import Cork.Sprites.Cache (Hash)
+import Cork.Sprites.Caches (Hash)
 import Cork.Sprites.Sprite.Filters (FiltersRow)
 import Cork.Sprites.Sprite.Filters (grayscale, hash, stackedBlur) as Filters
 import Cork.Sprites.Sprite.Images (ExternalImageRow)

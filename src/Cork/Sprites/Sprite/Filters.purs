@@ -3,8 +3,8 @@ module Cork.Sprites.Sprite.Filters where
 import Prelude
 
 import Cork.Data.Functor.Variant.Mu (MuVariantF, inj)
-import Cork.Sprites.Cache (Hash)
-import Cork.Sprites.Cache (Hash) as Cache
+import Cork.Sprites.Caches (Hash)
+import Cork.Sprites.Caches (Hash) as Cache
 import Data.Functor.Mu (Mu)
 import Data.Functor.Variant (FProxy, VariantF, on)
 import Data.Hashable (hash) as Hashable

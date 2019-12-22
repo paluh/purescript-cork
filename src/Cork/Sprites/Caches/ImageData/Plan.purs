@@ -1,4 +1,4 @@
-module Cork.Sprites.Cache.Machine.Plan where
+module Cork.Sprites.Caches.ImageData.Plan where
 
 import Prelude
 

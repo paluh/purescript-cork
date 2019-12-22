@@ -3,7 +3,7 @@ module Cork.Sprites.Sprite.Images where
 import Prelude
 
 import Cork.Data.Functor.Variant.Mu (MuVariantF, inj)
-import Cork.Sprites.Cache (Hash)
+import Cork.Sprites.Caches (Hash)
 import Cork.Web.HTML.HTMLLoadedImageElement (Source(..))
 import Cork.Web.HTML.HTMLLoadedImageElement (Source) as HTMLLoadedImageElement
 import Data.Foldable (class Foldable, foldlDefault, foldrDefault)

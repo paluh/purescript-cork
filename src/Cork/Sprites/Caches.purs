@@ -1,6 +1,6 @@
-module Cork.Sprites.Cache
+module Cork.Sprites.Caches
   (module Types
   )
   where
 
-import Cork.Sprites.Cache.Types (Hash, Item(..), Cache, Caches, _imageData, imageDataL, _imageBitmap, imageBitmapL) as Types
+import Cork.Sprites.Caches.Types (Hash, Item(..), Cache, Caches, _imageData, imageDataL, _imageBitmap, imageBitmapL) as Types

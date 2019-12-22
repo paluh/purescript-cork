@@ -5,9 +5,9 @@ import Prelude
 import Cork.Data.Functor.Variant.Mu (MuVariantF, inj)
 import Cork.Graphics.Canvas.ImageBitmap (ImageBitmap)
 import Cork.Render (DrawCanvasImageSourceF)
-import Cork.Sprites.Cache (Cache)
-import Cork.Sprites.Cache (Hash, Item) as Cache
-import Cork.Sprites.Cache.Types (Caches)
+import Cork.Sprites.Caches (Cache)
+import Cork.Sprites.Caches (Hash, Item) as Cache
+import Cork.Sprites.Caches.Types (Caches)
 import Cork.Sprites.Sprite (Sprite)
 import Data.Functor.Variant (FProxy, VariantF)
 import Data.Lens (Lens')

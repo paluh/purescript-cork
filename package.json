@@ -2,6 +2,7 @@
   "name": "Corck app",
   "version": "0.1.0",
   "dependencies": {
+    "typescript": "^3.7.4",
     "webpack": "^4.41.2",
     "webpack-cli": "^3.3.10"
   }

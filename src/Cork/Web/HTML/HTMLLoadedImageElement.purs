@@ -21,7 +21,7 @@ import Seegee.Geometry.Distance.Units (Pixel, Screen) as Units
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM (Node) as Web.DOM
 import Web.DOM.Node (clone) as Web.DOM.Node
-import Web.HTML (HTMLImageElement)
+import Web.HTML (HTMLElement, HTMLImageElement)
 import Web.HTML.HTMLElement (toNode) as HTMLElement
 import Web.HTML.HTMLImageElement (setHeight, setWidth, toHTMLElement) as HTMLImageElement
 
@@ -94,6 +94,9 @@ naturalDimensions = naturalDimensions' >>> unsafeFromInt
   where
     unsafeFromInt ∷ { height ∷ Int, width ∷ Int } → Dimensions Units.Pixel
     unsafeFromInt = unsafeCoerce
+
+toHTMLElement ∷ HTMLLoadedImageElement → HTMLElement
+toHTMLElement (HTMLLoadedImageElement i) = HTMLImageElement.toHTMLElement i
 
 toHTMLImageElement ∷ HTMLLoadedImageElement → HTMLImageElement
 toHTMLImageElement (HTMLLoadedImageElement i) = i

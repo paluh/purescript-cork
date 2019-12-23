@@ -9,3 +9,4 @@
 /.psa*
 package-lock.json
 .spago
+*.js.map

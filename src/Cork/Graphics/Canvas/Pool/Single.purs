@@ -1,4 +1,4 @@
-module Frontend.Utils.Canvas.Pool where
+module Cork.Graphics.Canvas.Pool.Single where
 
 -- | XXX: (Re)consider:
 -- | * Migration to static three layer pool:

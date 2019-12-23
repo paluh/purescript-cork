@@ -3,11 +3,11 @@ module Cork.Graphics.Canvas.Pool.Double where
 import Prelude hiding (append)
 
 import Cork.Graphics.Canvas.CanvasElement (Dimensions) as CanvasElement
+import Cork.Graphics.Canvas.Pool.Single (Pool, above, append, below, new, setLogicalDimensions, setPhysicalDimensions, workspace) as Single
 import Cork.Web.HTML.HTMLDivElement (create) as HTMLDivElement
 import Cork.Web.HTML.HTMLElement (Display(..))
 import Cork.Web.HTML.HTMLElement (setDisplay) as HTMLElement
 import Effect (Effect)
-import Frontend.Utils.Canvas.Pool (Pool, above, append, below, new, setLogicalDimensions, setPhysicalDimensions, workspace) as Single
 import Geometry.Plane (Dimensions)
 import Graphics.Canvas (CanvasElement)
 import Seegee.Geometry.Distance.Units (Pixel, Screen) as Units

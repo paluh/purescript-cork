@@ -84,6 +84,13 @@ new dimensions = do
   setDimensions dimensions canvasElement
   pure canvasElement
 
+new' ∷ Geometry.Plane.Dimensions Units.Pixel → Effect CanvasElement
+new' physical =
+  let
+    logical = unsafeCoerce physical
+  in
+    new { physical, logical }
+
 foreign import clone ∷ CanvasElement → Effect CanvasElement
 
 toCanvasImageSource ∷ CanvasElement → CanvasImageSource

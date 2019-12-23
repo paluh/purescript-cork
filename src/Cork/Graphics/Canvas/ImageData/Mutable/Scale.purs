@@ -1,5 +1,4 @@
-module Cork.Graphics.Canvas.ImageData.Mutable.Scale
-  where
+module Cork.Graphics.Canvas.ImageData.Mutable.Scale where
 
 import Prelude
 

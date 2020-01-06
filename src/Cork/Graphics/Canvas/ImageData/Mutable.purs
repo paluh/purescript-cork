@@ -13,7 +13,7 @@ import Prelude
 import Cork.Graphics.Canvas.ImageData.Immutable (fromHTMLLoadedImageElement, toHTMLLoadedImageElement) as Immutable
 import Cork.Graphics.Canvas.ImageData.Mutable.ChangeOrientation (changeOrientation) as ChangeOrientation
 import Cork.Graphics.Canvas.ImageData.Mutable.Types (Mutable, unsafeFreeze, unsafeThaw)
-import Cork.Graphics.Canvas.ImageData.Mutable.Types (dimensions, freeze, getImageData, thaw, Mutable, unsafeFreeze, unsafeThaw) as Types
+import Cork.Graphics.Canvas.ImageData.Mutable.Types (dimensions, freeze, getImageData, getImageData', thaw, Mutable, unsafeFreeze, unsafeThaw) as Types
 import Cork.Web.HTML.HTMLLoadedImageElement (HTMLLoadedImageElement)
 import Data.Maybe (Maybe)
 import Effect (Effect)

@@ -1,6 +1,7 @@
 module Cork.Sprites.Caches.Types where
 
 import Cork.Graphics.Canvas.ImageBitmap (ImageBitmap)
+import Data.Either (Either)
 import Data.Lens (Lens')
 import Data.Lens.Record (prop)
 import Data.Map (Map)
@@ -9,9 +10,7 @@ import Graphics.Canvas (ImageData)
 
 type Hash = Int
 
-data Item a
-  = ProcessingError String
-  | Generated a
+type Item a = Either String a
 
 type Cache a = Map Hash (Item a)
 

@@ -5,16 +5,22 @@ module Cork.Render
   , Draw
   , ImageDataNode
   , Render
+  , Strategy(..)
   , render
   )
   where
 
 import Prelude
 
-import Cork.Graphics.Canvas.CanvasElement (Dimensions) as CanvasElement
-import Cork.Graphics.Canvas.Pool.Double (Pool, above, below, switch, workspace) as Double
-import Cork.Render.Types (DrawCanvasImageSourceF(..)) as Types
-import Cork.Render.Types (DrawCanvasImageSourceF(..), DrawF(..), DrawImageDataF(..))
+import Cork.Graphics.Canvas (TilesNumber(..))
+import Cork.Graphics.Canvas (drawImage, drawImagePerspective, drawImageScale) as Cork.Graphics.Canvas
+import Cork.Graphics.Canvas.Context2D (resetTransform)
+import Cork.Graphics.Canvas.ImageBitmap.Types (ImageBitmap)
+import Cork.Graphics.Canvas.Pool.Double (Pool, above, below, physicalDimensions, switch, workspace) as Double
+import Cork.Hashable (boundingBox, drawingStyle, point, quadrilateral) as Cork.Hashable
+import Cork.Render.Types (DrawCanvasImageSourceF(..), DrawF(..), DrawImageDataF(..), DrawingStyle)
+import Cork.Render.Types (defaultStyle, DrawingStyle, DrawCanvasImageSourceF(..)) as Types
+import Cork.Render.Zoom (Zoom(..))
 import Data.Bifoldable (bifoldMap)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -24,17 +30,16 @@ import Data.Monoid.Additive (Additive(..))
 import Data.Newtype (un) as Newtype
 import Data.Newtype (wrap)
 import Data.Tuple.Nested ((/\))
+import Debug.Trace (traceM)
 import Effect (Effect)
-import Geometry.Distance (toNumber) as Distance
-import Geometry.Plane (BoundingBox(..), Point(..))
-import Geometry.Plane.Point (Point)
-import Graphics.Canvas (CanvasElement, CanvasImageSource, ImageData)
-import Graphics.Canvas (Context2D, Dimensions, clearRect, drawImage, drawImageScale, getContext2D, putImageData) as Canvas
-import Seegee.Geometry.Distance.Units (Pixel) as Units
+import Geometry.Plane (Point(..))
+import Geometry.Plane.BoundingBox.Dimensions (toNumbers) as Dimensions
+import Graphics.Canvas (CanvasElement, ImageData)
+import Graphics.Canvas (Composite(..), Context2D, Dimensions, clearRect, getContext2D, putImageData, restore, save, scale, setGlobalAlpha, setGlobalCompositeOperation) as Canvas
 
 -- | XXX: Possibly migrate to `ImageBitmap` with
 -- | hidden hash.
-type CanvasImageSourceNode = { hash ∷ Int, canvasImageSource ∷ CanvasImageSource }
+type CanvasImageSourceNode = { hash ∷ Int, canvasImageSource ∷ ImageBitmap }
 type ImageDataNode = { hash ∷ Int, imageData ∷ ImageData }
 
 -- | XXX: Rename to `Drawing`
@@ -42,37 +47,43 @@ type Draw = DrawF ImageDataNode CanvasImageSourceNode
   -- | DrawPerspective (Quadrilateral Units.Pixel) CanvasImageSource
   -- | PutImageData (Point Units.Pixel) ImageData
 
-pointHash ∷ Point Units.Pixel → Int
-pointHash (Point p) = hash p
-
-boundingBoxHash ∷ BoundingBox Units.Pixel → Int
-boundingBoxHash (BoundingBox { height, width, x, y }) =
-  hash (Distance.toNumber height /\ Distance.toNumber width /\ hash x /\ hash y)
-
 drawHash ∷ Draw → Int
 drawHash (DrawF e) = Newtype.un Additive <<< bifoldMap (wrap <<< putImageDataHash) (wrap <<< drawImageHash) $ e
   where
-    drawImageHash (DrawImage p image) =
-      hash (pointHash p /\ image.hash)
-    drawImageHash (DrawImageScale bb image) =
-      hash (boundingBoxHash bb /\ image.hash)
+    drawImageHash (DrawImage p style image) =
+      hash (Cork.Hashable.point p /\ Cork.Hashable.drawingStyle style /\ image.hash)
+    drawImageHash (DrawImageScale bb style image) =
+      hash (Cork.Hashable.boundingBox bb /\ Cork.Hashable.drawingStyle style /\image.hash)
+    drawImageHash (DrawImagePerspective quad (TilesNumber tilesNumber) style image) =
+      hash (Cork.Hashable.quadrilateral quad /\ tilesNumber /\ Cork.Hashable.drawingStyle style /\image.hash)
 
     putImageDataHash (PutImageData p imageData) =
-      hash (pointHash p /\ imageData.hash)
+      hash (Cork.Hashable.point p /\ imageData.hash)
+
+styleDraw ∷ Canvas.Context2D → DrawingStyle → Effect Unit → Effect Unit
+styleDraw _ { compositeOperation: Canvas.SourceOver, alpha: 1.0 } d = d
+styleDraw ctx style d = do
+  Canvas.save ctx
+  Canvas.setGlobalAlpha ctx style.alpha
+  Canvas.setGlobalCompositeOperation ctx style.compositeOperation
+  d
+  Canvas.restore ctx
 
 draw ∷ Canvas.Context2D → Draw → Effect Unit
 draw ctx (DrawF (Left (PutImageData (Point p) image))) =
   Canvas.putImageData ctx image.imageData p.x p.y
-draw ctx (DrawF (Right (DrawImage (Point p) image))) = Canvas.drawImage ctx image.canvasImageSource p.x p.y
-draw ctx (DrawF (Right (DrawImageScale (BoundingBox { height, width, x, y }) image))) =
-  Canvas.drawImageScale
-    ctx image.canvasImageSource x y
-    (Distance.toNumber width) (Distance.toNumber height)
+draw ctx (DrawF (Right (DrawImage p style image))) = styleDraw ctx style $
+  Cork.Graphics.Canvas.drawImage ctx image.canvasImageSource p
+draw ctx (DrawF (Right (DrawImageScale bb style image))) = styleDraw ctx style $
+  Cork.Graphics.Canvas.drawImageScale
+    ctx image.canvasImageSource bb
+draw ctx (DrawF (Right (DrawImagePerspective quad tilesNumber style image))) = styleDraw ctx style $
+  Cork.Graphics.Canvas.drawImagePerspective ctx quad image.canvasImageSource tilesNumber
 
 type Context =
   { hash ∷ Maybe Int
   , pool ∷ Double.Pool
-  , dimensions ∷ CanvasElement.Dimensions
+  , zoom ∷ Zoom
   }
 
 type Render =
@@ -81,28 +92,43 @@ type Render =
   , workspace ∷ Array Draw
   }
 
-render ∷ Context → Render → Effect Context
-render ctx@{ dimensions, pool } { above, below, workspace } = do
-  let
-    dimensions' =
-      { height: Distance.toNumber dimensions.physical.height
-      , width: Distance.toNumber dimensions.physical.width
-      }
-    -- | We can cache hash on Draw level too
-    currentHash = Just <<<  hash $ hash (map drawHash above) /\ hash (map drawHash below) /\ hash (map drawHash workspace)
-  case ctx.hash, currentHash of
-    Just prev, Just curr | prev == curr → pure ctx
-    _, _ → do
-      renderLayer dimensions' (Double.above pool) above
-      renderLayer dimensions' (Double.below pool) below
-      renderLayer dimensions' (Double.workspace pool) workspace
+data Strategy
+  = Force
+  | CompareHashes
 
-      pool' ← Double.switch pool
-      pure { dimensions, hash: currentHash, pool: pool' }
+render ∷ Context → Strategy → Render → Effect Context
+render ctx@{ pool } strategy r@{ above, below, workspace } = do
+  physicalDimensions ← Dimensions.toNumbers <$> Double.physicalDimensions pool
+  -- traceM "Cork.Render called"
+  case strategy of
+    Force → do
+      -- traceM "FORCE REDRAW"
+      { hash: currentHash, pool: _, zoom: ctx.zoom } <$> renderLayers physicalDimensions ctx.zoom pool r
+    -- | XXX: This should be done on layer level!
+    CompareHashes → case ctx.hash, currentHash of
+      Just prev, Just curr | prev == curr → do
+        -- traceM "SKIPPING"
+        pure ctx
+      _, _ → do
+        -- traceM "REDRAWING BECAUSE HASHES ARE DIFFERENT"
+        -- traceM ctx.hash
+        -- traceM currentHash
+        { hash: currentHash, pool: _, zoom: ctx.zoom } <$> renderLayers physicalDimensions ctx.zoom pool r
+    where
+      currentHash = Just <<<  hash $ (map drawHash above) /\ (map drawHash below) /\ (map drawHash workspace)
 
-renderLayer ∷ Canvas.Dimensions → CanvasElement → Array Draw → Effect Unit
-renderLayer { height, width } canvas draws = do
+renderLayers ∷ Canvas.Dimensions → Zoom → Double.Pool → Render → Effect Double.Pool
+renderLayers dimensions zoom pool { above, below, workspace } = do
+  renderLayer dimensions zoom (Double.above pool) above
+  renderLayer dimensions zoom (Double.below pool) below
+  renderLayer dimensions zoom (Double.workspace pool) workspace
+  Double.switch pool
+
+renderLayer ∷ Canvas.Dimensions → Zoom → CanvasElement → Array Draw → Effect Unit
+renderLayer { height, width } (Zoom zoom) canvas draws = do
   ctx ← Canvas.getContext2D canvas
+  resetTransform ctx
+  Canvas.scale ctx { scaleX: zoom.ratio, scaleY: zoom.ratio }
   -- height ← Canvas.getCanvasHeight canvas
   -- width ← Canvas.getCanvasWidth canvas
   let

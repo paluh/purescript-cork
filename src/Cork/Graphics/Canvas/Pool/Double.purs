@@ -2,8 +2,8 @@ module Cork.Graphics.Canvas.Pool.Double where
 
 import Prelude hiding (append)
 
-import Cork.Graphics.Canvas.CanvasElement (Dimensions) as CanvasElement
-import Cork.Graphics.Canvas.Pool.Single (Pool, above, append, below, new, setLogicalDimensions, setPhysicalDimensions, workspace) as Single
+import Cork.Graphics.Canvas.CanvasElement (Dimensions, ImageRendering) as CanvasElement
+import Cork.Graphics.Canvas.Pool.Single (Pool, above, append, below, new, physicalDimensions, setImageRendering, setLogicalDimensions, setPhysicalDimensions, workspace) as Single
 import Cork.Web.HTML.HTMLDivElement (create) as HTMLDivElement
 import Cork.Web.HTML.HTMLElement (Display(..))
 import Cork.Web.HTML.HTMLElement (setDisplay) as HTMLElement
@@ -59,6 +59,11 @@ switch (Pool pool) = do
     , visible: pool.hidden
     }
 
+setImageRendering ∷ CanvasElement.ImageRendering → Pool → Effect Unit
+setImageRendering imageRendering (Pool p) = do
+  Single.setImageRendering imageRendering p.visible.pool
+  Single.setImageRendering imageRendering p.hidden.pool
+
 setPhysicalDimensions ∷ Dimensions Units.Pixel → Pool → Effect Unit
 setPhysicalDimensions dimensions (Pool pool) = do
   Single.setPhysicalDimensions dimensions pool.visible.pool
@@ -68,6 +73,14 @@ setLogicalDimensions ∷ Dimensions Units.Screen → Pool → Effect Unit
 setLogicalDimensions dimensions (Pool pool) = do
   Single.setLogicalDimensions dimensions pool.visible.pool
   Single.setLogicalDimensions dimensions pool.hidden.pool
+
+setDimensions ∷ CanvasElement.Dimensions → Pool → Effect Unit
+setDimensions { logical, physical } pool = do
+  setLogicalDimensions logical pool
+  setPhysicalDimensions physical pool
+
+physicalDimensions ∷ Pool → Effect (Dimensions Units.Pixel)
+physicalDimensions (Pool pool) = Single.physicalDimensions pool.visible.pool
 
 above ∷ Pool → CanvasElement
 above (Pool p) = Single.above p.hidden.pool

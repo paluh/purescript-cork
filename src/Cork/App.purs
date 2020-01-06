@@ -12,9 +12,11 @@ module Cork.App
 
 import Prelude
 
-import Cork.Graphics.Canvas.CanvasElement (Dimensions) as CanvasElement
-import Cork.Graphics.Canvas.Pool.Double (append, new) as Double
+import Cork.Graphics.Canvas.CanvasElement (Dimensions, ImageRendering(..)) as CanvasElement
+import Cork.Graphics.Canvas.Pool.Double (append, new, physicalDimensions, setDimensions, setImageRendering, setLogicalDimensions) as Double
 import Cork.Render (Render, Context, render) as Render
+import Cork.Render (Strategy(..))
+import Cork.Render.Zoom (Zoom(..))
 import Data.Const (Const)
 import Data.Foldable (for_)
 import Data.Functor.Coproduct (Coproduct, left, right)
@@ -42,10 +44,7 @@ type App effects subs model action =
   , init ∷ Transition effects model action
   }
 
-type Config =
-  { dimensions ∷ CanvasElement.Dimensions
-  , parent ∷ HTMLElement
-  }
+type Config = { dimensions ∷ CanvasElement.Dimensions }
 
 -- | A type synonym for Apps which don't have subs.
 type BasicApp effects model action = App effects (Const Void) model action
@@ -57,10 +56,12 @@ type BasicApp effects model action = App effects (Const Void) model action
 -- |    * `restore` - Replaces the current model of the App.
 -- |    * `subscribe` - Listens to App changes (model and actions).
 type AppInstance model action =
-  { push ∷ action → Effect Unit
+  { append ∷ HTMLElement → Effect Unit
+  , push ∷ action → Effect Unit
   , run ∷ Effect Unit
   , snapshot ∷ Effect model
   , restore ∷ model → Effect Unit
+  , setDimensions ∷ CanvasElement.Dimensions → Effect Unit
   , subscribe ∷ (AppChange model action → Effect Unit) → Effect (Effect Unit)
   }
 
@@ -71,10 +72,12 @@ type AppChange model action =
   }
 
 data AppAction m q s i
-  = Restore s
-  | Action i
+  = Action i
+  | Append HTMLElement
   | Interpret (Coproduct m q i)
   | Render
+  | Restore s
+  | SetDimensions CanvasElement.Dimensions
 
 data RenderStatus
   = NoChange
@@ -146,9 +149,23 @@ makeAppQueue onChange (Interpreter interpreter) app cfg = EventQueue.withAccum \
           status = nextStatus state.model nextModel state.status
           nextState = state { model = nextModel, status = status }
         pure nextState
-      Render → do
-        renderContext' ← Render.render state.renderContext (app.render state.model)
-        pure $ state { status = Flushed, renderContext = renderContext' }
+      Append parent → do
+        Double.append state.renderContext.pool parent
+        pure state
+      Render → render state CompareHashes
+      SetDimensions dimensions → do
+        physicalDimensions ← Double.physicalDimensions state.renderContext.pool
+        if (physicalDimensions /= dimensions.physical)
+          then do
+            Double.setDimensions dimensions state.renderContext.pool
+            render state Force
+          else do
+            Double.setLogicalDimensions dimensions.logical state.renderContext.pool
+            pure state
+
+    render state strategy = do
+      renderContext' ← Render.render state.renderContext strategy (app.render state.model)
+      pure $ state { status = Flushed, renderContext = renderContext' }
 
     commit
       ∷ AppState m q s i
@@ -178,18 +195,18 @@ makeAppQueue onChange (Interpreter interpreter) app cfg = EventQueue.withAccum \
   interpret ← interpreter (self { push = self.push <<< Action })
   foreachE (unBatch app.init.effects) pushEffect
   pool ← Double.new cfg.dimensions
+  Double.setImageRendering CanvasElement.Pixelated pool
   let
     init =
       { model: app.init.model
       , status: NoChange
       , interpret
       , renderContext:
-        { dimensions: cfg.dimensions
-        , hash: Nothing
+        { hash: Nothing
         , pool
+        , zoom: Zoom { pan: mempty, ratio: 1.0 }
         }
       }
-  Double.append pool cfg.parent
   pure { init, update, commit }
 
 -- | Builds a running App given an `Interpreter` and a parent DOM Node.
@@ -241,10 +258,12 @@ make interpreter app cfg = do
     EventQueue.fix $ makeAppQueue handleChange interpreter app cfg
 
   pure
-    { push: push <<< Action
-    , snapshot: Ref.read stateRef
+    { append: push <<< Append
+    , push: push <<< Action
     , restore: push <<< Restore
-    , subscribe: subscribe'
     , run
+    , snapshot: Ref.read stateRef
+    , subscribe: subscribe'
+    , setDimensions: push <<< SetDimensions
     }
 

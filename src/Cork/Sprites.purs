@@ -1,39 +1,51 @@
-module Cork.Sprites where
+module Cork.Sprites
+  ( module Exports
+  , machine
+  , Machine
+  , Scene
+  )
+  where
 
 import Prelude
 
 import Cork.App (Config)
 import Cork.App (make) as Cork.App
+import Cork.Graphics.Canvas.CanvasElement (Dimensions) as CanvasElement
 import Cork.Graphics.Canvas.ImageBitmap (ImageBitmap)
-import Cork.Graphics.Canvas.ImageBitmap (toCanvasImageSource) as ImageBitmap
 import Cork.Render (Draw, Render, Context) as Render
 import Cork.Render.Types (DrawCanvasImageSourceF(..), DrawF(..), DrawImageDataF(..))
 import Cork.Sprites.Caches (Cache, Caches, imageBitmapL, imageDataL)
-import Cork.Sprites.Caches (Item(..)) as Cache
-import Cork.Sprites.Caches.Machine (Change(..), Drawing, Drawings)
+import Cork.Sprites.Caches.Machine (Change(..), Draw, Draws)
+import Cork.Sprites.Caches.Machine (Change(..), drawImage, drawImageData, drawImagePerspective, drawImageScale, Draw, Draws, putImageData) as Exports
 import Cork.Sprites.Caches.Machine (machine) as Caches.Machine
-import Cork.Sprites.Sprite (hash) as Sprite
 import Data.Array (catMaybes)
 import Data.Bitraversable (bitraverse)
+import Data.Either (Either(..))
+import Data.Functor.Mu (Mu(..))
+import Data.Hashable (hash)
 import Data.Lens (Lens', set)
 import Data.Lens.Record (prop)
 import Data.Map (lookup) as Map
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Graphics.Canvas (ImageData)
+import Record (insert) as Record
 import Spork.Interpreter (basicEffect)
 import Spork.Interpreter (merge) as Interpreter
 import Spork.Transition (Transition, purely)
 import Type.Prelude (SProxy(..))
+import Web.HTML (HTMLElement)
 
 type Scene =
-  { above ∷ Drawings
-  , below ∷ Drawings
-  , workspace ∷ Drawings
+  { above ∷ Draws
+  , below ∷ Draws
+  , workspace ∷ Draws
   }
 
 type Model =
   { caches ∷ Caches
+  , dimensions ∷ CanvasElement.Dimensions
+  , done ∷ Maybe (Scene → Effect Unit)
   , scene ∷ Scene
   }
 
@@ -45,7 +57,7 @@ cachesL = prop _caches
 data Action
   = SetImageBitmapCache (Cache ImageBitmap)
   | SetImageDataCache (Cache ImageData)
-  | Load Scene
+  | Load { done ∷ Maybe (Scene → Effect Unit), scene ∷ Scene }
 
 render ∷ Model → Render.Render
 render model =
@@ -54,40 +66,53 @@ render model =
   , workspace: renderDraws model.scene.workspace
   }
   where
+    -- x = do
+    --   traceM "Sprites.Render called"
+    --   Nothing
     renderDraws = catMaybes <<< map (renderDraw model.caches)
 
-renderDraw ∷ Caches → Drawing → Maybe Render.Draw
+renderDraw ∷ Caches → Draw → Maybe Render.Draw
 renderDraw caches (DrawF e) = DrawF <$> (bitraverse renderPutImageData renderDrawImage e)
   where
     renderPutImageData (PutImageData point sprite) =
       (PutImageData point) <$> spriteImageData sprite
+    renderDrawImage (DrawImage point style sprite) =
+      (DrawImage point style) <$> spriteBitmap sprite
+    renderDrawImage (DrawImageScale bb style sprite) =
+      (DrawImageScale bb style) <$> spriteBitmap sprite
+    renderDrawImage (DrawImagePerspective quad tilesNumber style sprite) =
+      (DrawImagePerspective quad tilesNumber style) <$> spriteBitmap sprite
 
-    renderDrawImage (DrawImage point sprite) =
-      (DrawImage point) <$> spriteBitmap sprite
-    renderDrawImage (DrawImageScale bb sprite) =
-      (DrawImageScale bb) <$> spriteBitmap sprite
-
-    spriteBitmap sprite = case Map.lookup hash caches.imageBitmap of
-      Just (Cache.Generated imageBitmap) → Just
-        { hash
-        , canvasImageSource: ImageBitmap.toCanvasImageSource imageBitmap
+    spriteBitmap sprite = case Map.lookup h caches.imageBitmap of
+      Just (Right imageBitmap) → Just
+        { hash: h
+        , canvasImageSource: imageBitmap
         }
       -- | `Failed`
-      Just _ → Nothing
-      Nothing → Nothing
+      Just _ → do
+        -- traceM "FAILURED"
+        Nothing
+      Nothing → do
+        -- traceM $ ((length caches.imageBitmap) ∷ Int)
+        -- traceM caches.imageBitmap
+        -- traceM $ Array.fromFoldable $ Map.Internal.keys caches.imageData
+        -- traceM $ Array.fromFoldable $ Map.Internal.keys caches.imageBitmap
+        -- traceM h
+        -- traceM "MISSING"
+        Nothing
       where
-        hash = Sprite.hash sprite
+        h = hash sprite
 
-    spriteImageData sprite = case Map.lookup hash caches.imageData of
-      Just (Cache.Generated imageData) → Just
-        { hash
+    spriteImageData (In i) = case Map.lookup h caches.imageData of
+      Just (Right imageData) → Just
+        { hash: h
         , imageData
         }
       -- | `Failed`
       Just _ → Nothing
       Nothing → Nothing
       where
-        hash = Sprite.hash sprite
+        h = hash i
 
 update ∷ Render.Context → Model → Action → Transition Effect Model Action
 update renderContext model = case _ of
@@ -95,10 +120,22 @@ update renderContext model = case _ of
     purely (set (cachesL <<< imageBitmapL) imageBitmap model)
   SetImageDataCache imageData →
     purely (set (cachesL <<< imageDataL) imageData model)
-  Load scene →
-    purely (model { scene = scene })
+  Load { done, scene } →
+    purely (model { done = done, scene = scene })
 
-machine ∷ Config → Effect { load ∷ Scene → Effect Unit, run ∷ Effect Unit }
+type Machine =
+  { append ∷ HTMLElement → Effect Unit
+  , render
+    ∷ { scene ∷ Scene
+      , dimensions ∷ CanvasElement.Dimensions
+      , done ∷ Maybe (Scene → Effect Unit)
+      }
+    → Effect Unit
+  , run ∷ Effect Unit
+  -- , setDimensions ∷ CanvasElement.Dimensions → Effect Unit
+  }
+
+machine ∷ Config → Effect Machine
 machine config = do
   let
     app =
@@ -106,26 +143,37 @@ machine config = do
       , subs: const mempty
       , update
       , init:
-        { model: mempty
+        { model: Record.insert (SProxy ∷ SProxy "dimensions") config.dimensions mempty
         , effects: mempty
         }
       }
   i ← Cork.App.make (basicEffect `Interpreter.merge` basicEffect) app config
   cachesMachine ← Caches.Machine.machine
 
+  let
+    whenDone done = when done $ i.snapshot >>= \m → case m.done of
+      Just callback → callback m.scene
+      Nothing → pure unit
+
   void $ cachesMachine.subscribe case _ of
-    ImageDataChange change → do
+    { done, change: ImageDataChange change } → do
+      whenDone done
       i.push (SetImageDataCache change.cache)
       i.run
-    ImageBitmapChange change → do
+    { done, change: ImageBitmapChange change } → do
+      whenDone done
       i.push (SetImageBitmapCache change.cache)
       i.run
   let
-    load scene = do
-      cachesMachine.load (scene.above <> scene.below <> scene.workspace)
-      i.push (Load scene)
+    renderScene { dimensions, done, scene } = do
+      whenM (i.snapshot <#> _.dimensions >>> eq dimensions >>> not) $
+        i.setDimensions dimensions
+      cachesMachine.process (scene.above <> scene.below <> scene.workspace)
+      i.push (Load { done, scene })
+      i.run
   pure
-    { load
+    { append: \a → i.append a *> i.run
+    , render: renderScene
     , run: i.run
     }
 

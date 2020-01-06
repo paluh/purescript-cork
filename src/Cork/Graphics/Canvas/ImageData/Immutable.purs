@@ -1,8 +1,7 @@
 module Cork.Graphics.Canvas.ImageData.Immutable
   ( fromHTMLLoadedImageElement
+  , module Types
   , toHTMLLoadedImageElement
-  , height
-  , width
   )
   where
 
@@ -10,26 +9,15 @@ import Prelude
 
 import Cork.Graphics.Canvas.CanvasElement (new') as CanvasElement
 import Cork.Graphics.Canvas.CanvasElement (setMinCanvasPhysicalDimensions, setPhysicalDimensions)
+import Cork.Graphics.Canvas.ImageData.Immutable.Types (dimensions, height, Immutable, width) as Types
 import Cork.Web.HTML.HTMLLoadedImageElement (HTMLLoadedImageElement, Source(..))
 import Cork.Web.HTML.HTMLLoadedImageElement (naturalDimensions, new, toCanvasImageSource) as HTMLLoadedImageElement
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
-import Geometry (Distance)
-import Geometry.Distance (toNumber, unsafeFromInt) as Distance
-import Geometry.Plane.BoundingBox.Dimensions (Dimensions)
-import Graphics.Canvas (CanvasElement, ImageData, canvasToDataURL, drawImage, getContext2D, getImageData, imageDataHeight, imageDataWidth, putImageData)
-import Seegee.Geometry.Distance.Units (Pixel) as Units
-
-height ∷ ImageData → Distance Units.Pixel
-height = Distance.unsafeFromInt <<< imageDataHeight
-
-width ∷ ImageData → Distance Units.Pixel
-width = Distance.unsafeFromInt <<< imageDataWidth
-
-dimensions ∷ ImageData → Dimensions Units.Pixel
-dimensions imageData = { height: height imageData, width: width imageData }
+import Geometry.Distance (toNumber) as Distance
+import Graphics.Canvas (CanvasElement, ImageData, canvasToDataURL, drawImage, getContext2D, getImageData, putImageData)
 
 fromHTMLLoadedImageElement ∷ Maybe CanvasElement → HTMLLoadedImageElement → Effect ImageData
 fromHTMLLoadedImageElement possibleCanvas img = case possibleCanvas of
@@ -64,7 +52,7 @@ toHTMLLoadedImageElement possibleCanvas imageData = case possibleCanvas of
     canvas ← liftEffect $ CanvasElement.new' physical
     go canvas
   where
-    physical = dimensions imageData
+    physical = Types.dimensions imageData
     go canvas = do
       url ← liftEffect $ do
         setPhysicalDimensions physical canvas

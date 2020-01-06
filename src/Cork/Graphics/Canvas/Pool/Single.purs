@@ -9,8 +9,7 @@ module Cork.Graphics.Canvas.Pool.Single where
 
 import Prelude
 
-import Cork.Graphics.Canvas.CanvasElement (Dimensions)
-import Cork.Graphics.Canvas.CanvasElement (new, setLogicalDimensions, setPhysicalDimensions, toHTMLCanvasElement) as CanvasElement
+import Cork.Graphics.Canvas.CanvasElement (Dimensions, ImageRendering, new, physicalDimensions, setImageRendering, setLogicalDimensions, setPhysicalDimensions, toHTMLCanvasElement) as CanvasElement
 import Effect (Effect)
 import Geometry.Plane.BoundingBox.Dimensions (Dimensions) as Dimensions
 import Graphics.Canvas (CanvasElement)
@@ -27,7 +26,7 @@ newtype Pool = Pool
   , workspace ∷ CanvasElement
   }
 
-new ∷ Dimensions → Effect Pool
+new ∷ CanvasElement.Dimensions → Effect Pool
 new dimensions = do
   let
     setStyle zIndex canvas =
@@ -54,6 +53,20 @@ setLogicalDimensions dimensions (Pool p) = do
   CanvasElement.setLogicalDimensions dimensions p.above
   CanvasElement.setLogicalDimensions dimensions p.below
   CanvasElement.setLogicalDimensions dimensions p.workspace
+
+setDimensions ∷ CanvasElement.Dimensions → Pool → Effect Unit
+setDimensions dimensions pool = do
+  setLogicalDimensions dimensions.logical pool
+  setPhysicalDimensions dimensions.physical pool
+
+setImageRendering ∷ CanvasElement.ImageRendering → Pool → Effect Unit
+setImageRendering imageRendering (Pool p) = do
+  CanvasElement.setImageRendering imageRendering p.above
+  CanvasElement.setImageRendering imageRendering p.below
+  CanvasElement.setImageRendering imageRendering p.workspace
+
+physicalDimensions ∷ Pool → Effect (Dimensions.Dimensions Units.Pixel)
+physicalDimensions (Pool pool) = CanvasElement.physicalDimensions pool.above
 
 append ∷ Pool → HTMLElement → Effect Unit
 append (Pool p) parentDiv = do

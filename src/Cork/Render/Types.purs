@@ -4,6 +4,7 @@ module Cork.Render.Types where
 
 import Prelude
 
+import Cork.Graphics.Canvas (TilesNumber)
 import Data.Bifoldable (class Bifoldable, bifoldlDefault, bifoldrDefault)
 import Data.Bifunctor (class Bifunctor, bimap)
 import Data.Either (Either, either)
@@ -11,27 +12,49 @@ import Data.Foldable (class Foldable, foldMap, foldlDefault, foldrDefault)
 import Data.Newtype (class Newtype)
 import Data.Traversable (class Traversable, traverseDefault)
 import Geometry.Plane (BoundingBox, Point)
+import Geometry.Plane.Figures.Polygons.Quadrilateral (Quadrilateral)
+import Graphics.Canvas (Composite(..)) as Canvas
 import Seegee.Geometry.Distance.Units (Pixel) as Units
+
+type DrawingStyle =
+  { compositeOperation ∷ Canvas.Composite
+  , alpha ∷ Number
+  }
+
+defaultStyle ∷ DrawingStyle
+defaultStyle =
+  { alpha: 1.0
+  , compositeOperation: Canvas.SourceOver
+  }
 
 -- | Move hash outside
 data DrawCanvasImageSourceF canvasImageSource
   = DrawImage
     (Point Units.Pixel)
+    DrawingStyle
     canvasImageSource
   | DrawImageScale
     (BoundingBox Units.Pixel)
+    DrawingStyle
+    canvasImageSource
+  | DrawImagePerspective
+    (Quadrilateral Units.Pixel)
+    TilesNumber
+    DrawingStyle
     canvasImageSource
 derive instance functorDrawCanvasImageSourceF ∷ Functor DrawCanvasImageSourceF
 instance foldableDrawCanvasImageSourceF ∷ Foldable DrawCanvasImageSourceF where
-  foldMap f (DrawImage _ c) = f c
-  foldMap f (DrawImageScale _ c) = f c
+  foldMap f (DrawImage _ _ c) = f c
+  foldMap f (DrawImageScale _ _ c) = f c
+  foldMap f (DrawImagePerspective _ _ _ c) = f c
 
   foldr f = foldrDefault f
   foldl f = foldlDefault f
 
 instance traversableDrawCanvasImageSourceF ∷ Traversable DrawCanvasImageSourceF where
-  sequence (DrawImage p c) = DrawImage p <$> c
-  sequence (DrawImageScale bb c) = DrawImageScale bb <$> c
+  sequence (DrawImage p s c) = DrawImage p s <$> c
+  sequence (DrawImageScale bb s c) = DrawImageScale bb s <$> c
+  sequence (DrawImagePerspective quad tn s c) = DrawImagePerspective quad tn s <$> c
 
   traverse = traverseDefault
 
@@ -58,5 +81,3 @@ instance bifoldableDrawF ∷ Bifoldable DrawF where
 instance bifunctorDrawF ∷ Bifunctor DrawF where
   bimap f g (DrawF e) = DrawF (bimap (map f) (map g) e)
 
-
--- drawing ∷ (DrawCanvasImageSourceF canvasImageSource → a) → (

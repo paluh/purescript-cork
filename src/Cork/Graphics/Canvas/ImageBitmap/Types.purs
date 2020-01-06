@@ -6,8 +6,8 @@ import Control.Promise (Promise)
 import Control.Promise (toAff) as Promise
 import Cork.Graphics.Canvas.CanvasElement (setPhysicalDimensions)
 import Cork.Graphics.Canvas.ImageData.Immutable (height, width) as ImageData.Immutable
-import Cork.Graphics.Canvas.ImageData.Mutable.Types (getImageData, unsafeFreeze) as ImageData.Mutable
 import Cork.Graphics.Canvas.ImageData.Mutable.Types (Mutable) as ImageData
+import Cork.Graphics.Canvas.ImageData.Mutable.Types (getImageData, unsafeFreeze) as ImageData.Mutable
 import Cork.Graphics.Canvas.ImageData.Types (AnyImageData(..))
 import Cork.Web.HTML.HTMLLoadedImageElement (HTMLLoadedImageElement, Source(..))
 import Cork.Web.HTML.HTMLLoadedImageElement (Source, clone, naturalDimensions, new, setHeight, setWidth) as HTMLLoadedImageElement
@@ -17,8 +17,9 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Geometry.Distance (ConversionFactor, Distance)
-import Geometry.Distance (convert, toNumber, unsafeFromInt) as Distance
+import Geometry.Distance (convert, unsafe) as Distance
 import Geometry.Distance.ConversionFactor (unsafe) as ConversionFactor
+import Geometry.Plane (BoundingBox(..))
 import Geometry.Plane.BoundingBox.Dimensions (Dimensions)
 import Graphics.Canvas (CanvasElement, CanvasImageSource, ImageData, canvasToDataURL, getContext2D, putImageData)
 import Graphics.Canvas (drawImage) as Canvas
@@ -48,17 +49,20 @@ selfCreateImageBitmapFromImageData ∷ Effect (Maybe (ImageData → Aff ImageBit
 selfCreateImageBitmapFromImageData = selfUnsafeCreateImageBitmap
 
 height ∷ ImageBitmap → Distance Units.Pixel
-height = Distance.unsafeFromInt <<< height'
+height = Distance.unsafe <<< height'
 
-foreign import height' ∷ ImageBitmap → Int
+foreign import height' ∷ ImageBitmap → Number
 
 width ∷ ImageBitmap → Distance Units.Pixel
-width = Distance.unsafeFromInt <<< width'
+width = Distance.unsafe <<< width'
 
-foreign import width' ∷ ImageBitmap → Int
+foreign import width' ∷ ImageBitmap → Number
 
 dimensions ∷ ImageBitmap → Dimensions Units.Pixel
 dimensions imageBitmap = { height: height imageBitmap, width: width imageBitmap }
+
+dimensions' ∷ ImageBitmap → { height ∷ Number, width ∷ Number }
+dimensions' imageBitmap =  { height: height' imageBitmap, width: width' imageBitmap }
 
 -- | Just a shortcut
 fromSource ∷ HTMLLoadedImageElement.Source → Aff ImageBitmap
@@ -105,8 +109,12 @@ fromAnyImageData workspace = toImageBitmap <=< case _ of
         pure $ unsafeFromHTMLLoadedImageElement img
         -- getImageData ctx 0.0 0.0 (Distance.toNumber width) (Distance.toNumber height)
 
-toMutableImageData ∷ CanvasElement → ImageBitmap → Effect ImageData.Mutable
-toMutableImageData workspace imageBitmap = do
+toMutableImageData
+  ∷ CanvasElement
+  → (Maybe (BoundingBox Units.Pixel))
+  → ImageBitmap
+  → Effect ImageData.Mutable
+toMutableImageData workspace possibleBoundingBox imageBitmap = do
   let
     w = width imageBitmap
     h = height imageBitmap
@@ -117,10 +125,15 @@ toMutableImageData workspace imageBitmap = do
     (toCanvasImageSource imageBitmap)
     0.0
     0.0
-  ImageData.Mutable.getImageData ctx 0.0 0.0 (Distance.toNumber w) (Distance.toNumber h)
+  let
+    bb = case possibleBoundingBox of
+      Nothing → BoundingBox { x: 0.0, y: 0.0, height: h, width: w }
+      Just b → b
+  ImageData.Mutable.getImageData ctx bb
 
-toImageData ∷ CanvasElement → ImageBitmap → Effect ImageData
-toImageData canvas = toMutableImageData canvas >=> ImageData.Mutable.unsafeFreeze
+toImageData ∷ CanvasElement → Maybe (BoundingBox Units.Pixel) → ImageBitmap → Effect ImageData
+toImageData canvas possibleBoundingBox =
+  toMutableImageData canvas possibleBoundingBox >=> ImageData.Mutable.unsafeFreeze
 
 toCanvasImageSource ∷ ImageBitmap → CanvasImageSource
 toCanvasImageSource = unsafeCoerce

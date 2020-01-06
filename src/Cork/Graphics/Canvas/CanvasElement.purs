@@ -1,22 +1,51 @@
-module Cork.Graphics.Canvas.CanvasElement where
+module Cork.Graphics.Canvas.CanvasElement
+  -- ( module Types
+  -- , fillDimensions
+  -- , setPhysicalDimensions
+  -- , setMinCanvasPhysicalDimensions
+  -- )
+  where
 
 import Prelude
 
+import Cork.Web.HTML.HTMLElement (setStyleProperty)
 import Effect (Effect)
 import Geometry.Distance (Distance(..))
 import Geometry.Distance (convert, toNumber) as Distance
 import Geometry.Numbers.NonNegative (NonNegative(..))
 import Geometry.Plane (Dimensions) as Geometry.Plane
-import Graphics.Canvas (CanvasElement, CanvasImageSource, getCanvasDimensions, setCanvasDimensions)
+import Geometry.Plane.BoundingBox.Dimensions (unsafe) as Dimensions
+import Graphics.Canvas (CanvasElement, CanvasImageSource, getCanvasDimensions, getCanvasHeight, getCanvasWidth, setCanvasDimensions)
 import Graphics.Canvas (Dimensions) as Canvas
 import Seegee.DevicePixelRatio (DevicePixelRatio)
 import Seegee.DevicePixelRatio (conversionFactor) as DevicePixelRatio
 import Seegee.Geometry.Distance.Units (Pixel, Screen) as Units
 import Unsafe.Coerce (unsafeCoerce)
-import Web.DOM.Element (setAttribute)
 import Web.HTML (HTMLCanvasElement)
 import Web.HTML.HTMLCanvasElement (toHTMLElement) as HTMLCanvasElement
-import Web.HTML.HTMLElement (toElement) as HTMLElement
+
+-- | I'm not sure if it is worth to provide global values.
+-- | `crips-edges` has really little support.
+-- |
+-- | image-rendering: auto;
+-- | image-rendering: crisp-edges;
+-- | image-rendering: pixelated;
+-- |
+-- | /* Global values */
+-- | image-rendering: inherit;
+-- | image-rendering: initial;
+-- | image-rendering: unset;
+data ImageRendering = Auto | Pixelated
+
+serImageRendering ∷ ImageRendering → String
+serImageRendering Auto = "auto"
+serImageRendering Pixelated = "pixelated"
+
+setImageRendering ∷ ImageRendering → CanvasElement → Effect Unit
+setImageRendering imageRendering canvasElement = do
+  setStyleProperty "image-rendering" (serImageRendering imageRendering) elem
+  where
+    elem = HTMLCanvasElement.toHTMLElement (toHTMLCanvasElement canvasElement)
 
 type Dimensions =
   { physical ∷ Geometry.Plane.Dimensions Units.Pixel
@@ -57,16 +86,21 @@ setMinCanvasPhysicalDimensions canvasElement dimensions =  do
 
 setLogicalDimensions ∷ Geometry.Plane.Dimensions Units.Screen → CanvasElement → Effect Unit
 setLogicalDimensions dimensions canvasElement = do
-  setAttribute "width" (serDistancePx dimensions.width) elem
-  setAttribute "height" (serDistancePx dimensions.height) elem
+  setStyleProperty "width" (serDistancePx dimensions.width) elem
+  setStyleProperty "height" (serDistancePx dimensions.height) elem
   where
-    elem = HTMLElement.toElement (HTMLCanvasElement.toHTMLElement (toHTMLCanvasElement canvasElement))
+    elem = HTMLCanvasElement.toHTMLElement (toHTMLCanvasElement canvasElement)
     serDistancePx d = (show $ Distance.toNumber d) <> "px"
 
 setDimensions ∷ Dimensions → CanvasElement → Effect Unit
 setDimensions dimensions canvasElement = do
   setPhysicalDimensions dimensions.physical canvasElement
   setLogicalDimensions dimensions.logical canvasElement
+
+-- | XXX: provide more methods
+physicalDimensions ∷ CanvasElement → Effect (Geometry.Plane.Dimensions Units.Pixel)
+physicalDimensions canvasElement = map Dimensions.unsafe $
+  { height: _, width: _} <$> getCanvasHeight canvasElement <*> getCanvasWidth canvasElement
 
 fromHTMLCanvasElement ∷ HTMLCanvasElement → CanvasElement
 fromHTMLCanvasElement = unsafeCoerce
@@ -96,3 +130,15 @@ foreign import clone ∷ CanvasElement → Effect CanvasElement
 toCanvasImageSource ∷ CanvasElement → CanvasImageSource
 toCanvasImageSource = unsafeCoerce
 
+-- foreign import clipPath2DImpl ∷ EffectFn3 Context2D Path2D String Unit
+-- 
+-- -- | "nonzero" is default value used by clip.
+-- data FillRule
+--   = NonZero
+--   | EvenOdd
+-- 
+-- clipPath ∷ Context2D → Path2D → FillRule → Effect Unit
+-- clipPath ctx path = case _ of
+--   NonZero → runEffectFn3 clipPath2DImpl ctx path "nonzero"
+--   EvenOdd → runEffectFn3 clipPath2DImpl ctx path "evenodd"
+-- 

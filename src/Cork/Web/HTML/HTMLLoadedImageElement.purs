@@ -7,6 +7,7 @@ import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
+import Data.Hashable (class Hashable, hash)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Compat (EffectFnAff, fromEffectFnAff)
@@ -31,6 +32,10 @@ data Source
   = URL String
   | DataURL ImageDataURL
 derive instance genericSource ∷ Generic Source _
+derive instance eqSource ∷ Eq Source
+instance hashableSource ∷ Hashable Source where
+  hash (DataURL d) = hash d
+  hash (URL u) = hash u
 
 instance encodeJsonSource ∷ EncodeJson Source where
   encodeJson = genericEncodeJson

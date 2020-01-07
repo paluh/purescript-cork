@@ -6,9 +6,9 @@ module Cork.Graphics.Canvas
 
 import Prelude
 
-import Cork.Graphics.Canvas.Context2D (clearRect, clipPath, resetTransform, FillRule(..)) as Context2D
+import Cork.Graphics.Canvas.Context2D (clearRect, clipPath, resetTransform, FillRule(..), TilesNumber(..)) as Context2D
 import Cork.Graphics.Canvas.ImageBitmap (ImageBitmap)
-import Cork.Graphics.Canvas.ImageBitmap (drawImage, drawImagePerspective, drawImageScale, ImageBitmap, toCanvasImageSource, TilesNumber(..)) as ImageBitmap
+import Cork.Graphics.Canvas.ImageBitmap (drawImage, drawImagePerspective, drawImageScale, ImageBitmap, toCanvasImageSource) as ImageBitmap
 import Cork.Graphics.Canvas.Path2D (Path2D)
 import Effect (Effect)
 import Effect.Uncurried (EffectFn3, EffectFn4, runEffectFn3, runEffectFn4)

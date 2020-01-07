@@ -78,7 +78,7 @@ draw ctx (DrawF (Right (DrawImageScale bb style image))) = styleDraw ctx style $
   Cork.Graphics.Canvas.drawImageScale
     ctx image.canvasImageSource bb
 draw ctx (DrawF (Right (DrawImagePerspective quad tilesNumber style image))) = styleDraw ctx style $
-  Cork.Graphics.Canvas.drawImagePerspective ctx quad image.canvasImageSource tilesNumber
+  Cork.Graphics.Canvas.drawImagePerspective ctx image.canvasImageSource quad tilesNumber
 
 type Context =
   { hash ∷ Maybe Int

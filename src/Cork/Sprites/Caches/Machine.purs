@@ -4,10 +4,11 @@ import Prelude
 
 import Cork.Data.Array.Builder (build, cons) as Array.Builder
 import Cork.Graphics.Canvas (ImageBitmap) as Canvas
-import Cork.Graphics.Canvas.CanvasElement (new') as CanvasElement
-import Cork.Graphics.Canvas.ImageBitmap (TilesNumber(..))
-import Cork.Graphics.Canvas.ImageBitmap (clipToImageData, fromAnyImageData, fromSource, toImageData) as ImageBitmap
+import Cork.Graphics.Canvas (TilesNumber(..))
+import Cork.Graphics.Canvas.CanvasElement (clone, new') as CanvasElement
+import Cork.Graphics.Canvas.ImageBitmap (clipToImageData, fromAnyImageData, fromSource, perspectiveToImageData, toImageData) as ImageBitmap
 import Cork.Graphics.Canvas.ImageData (AnyImageData(..))
+import Cork.Graphics.Canvas.ImageData.Immutable.Filters.Blur (filter) as Blur
 import Cork.Graphics.Canvas.ImageData.Mutable (thaw, unsafeFreeze) as ImageData.Mutable
 import Cork.Graphics.Canvas.ImageData.Mutable.Filters.Grayscale (filter) as Grayscale
 import Cork.Graphics.Canvas.ImageData.Mutable.Filters.Grayscale.ToAlpha (filter) as GrayscaleToAlpha
@@ -136,17 +137,21 @@ unfoldImageBitmapPlan workspace imageBitmap build = case imageBitmap of
     in
       Plan mempty (Map.singleton hash (Tuple process build))
 
-  Sprite.Project hash quad imageBitmap → unfoldImageBitmapPlan workspace imageBitmap \i →
-    Plan mempty
-      -- |XXXXXXXXXXX CHEATING HERE
-      (Map.singleton hash (Tuple (pure i) build))
-
 unfoldImageDataPlan
   ∷ AVar CanvasElement
   → Sprite.ImageData
   → (Item Canvas.ImageData → DrawingPlan)
   → DrawingPlan
 unfoldImageDataPlan workspace imageData build = case unroll imageData of
+  Sprite.Blur hash b imageData → unfoldImageDataPlan workspace imageData \i →
+    let
+      process i' = Aff.bracket
+        (AVar.Aff.take workspace)
+        (flip AVar.Aff.put workspace)
+        \c1 → liftEffect $ do
+          c2 ← CanvasElement.clone c1
+          Right <$> Blur.filter c1 c2 b i'
+    in step hash process build i
   Sprite.ClipImageBitmap hash path bb imageBitmap → unfoldImageBitmapPlan workspace imageBitmap \i →
     let
       process i' = Aff.bracket
@@ -178,7 +183,16 @@ unfoldImageDataPlan workspace imageData build = case unroll imageData of
         mutable ← ImageData.Mutable.thaw i'
         GrayscaleToAlpha.filter mode mutable
         Right <$> ImageData.Mutable.unsafeFreeze mutable
-    in step hash process build i
+    in
+      step hash process build i
+  Sprite.Project hash quad imageBitmap → unfoldImageBitmapPlan workspace imageBitmap \i →
+    let
+      process i' = Aff.bracket
+        (AVar.Aff.take workspace)
+        (flip AVar.Aff.put workspace)
+        (\w → liftEffect $ Right <$> ImageBitmap.perspectiveToImageData w quad (TilesNumber 10) i')
+    in
+      step hash process build i
   Sprite.StackedBlur hash radius imageData → unfoldImageDataPlan workspace imageData \i →
     let
       -- process imageData = onError (const $ "StackedBlur") $ liftEffect do

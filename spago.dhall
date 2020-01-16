@@ -17,6 +17,7 @@ You can edit this file as you like.
   , "pointed-list"
   , "seegee"
   , "spork"
+  , "stringutils"
   , "unordered-collections"
   , "unsafe-coerce"
   , "web-html"

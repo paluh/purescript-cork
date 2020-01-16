@@ -5,7 +5,6 @@ module Cork.Render
   , Draw
   , ImageDataNode
   , Render
-  , Strategy(..)
   , render
   )
   where
@@ -25,17 +24,17 @@ import Data.Bifoldable (bifoldMap)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Hashable (hash)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Data.Monoid.Additive (Additive(..))
 import Data.Newtype (un) as Newtype
 import Data.Newtype (wrap)
 import Data.Tuple.Nested ((/\))
 import Debug.Trace (traceM)
 import Effect (Effect)
-import Geometry.Plane (Point(..))
+import Geometry.Plane (Point(..), Vector(..))
 import Geometry.Plane.BoundingBox.Dimensions (toNumbers) as Dimensions
 import Graphics.Canvas (CanvasElement, ImageData)
-import Graphics.Canvas (Composite(..), Context2D, Dimensions, clearRect, getContext2D, putImageData, restore, save, scale, setGlobalAlpha, setGlobalCompositeOperation) as Canvas
+import Graphics.Canvas (Composite(..), Context2D, Dimensions, clearRect, getContext2D, putImageData, restore, save, scale, setGlobalAlpha, setGlobalCompositeOperation, translate) as Canvas
 
 -- | XXX: Possibly migrate to `ImageBitmap` with
 -- | hidden hash.
@@ -92,30 +91,25 @@ type Render =
   , workspace ∷ Array Draw
   }
 
-data Strategy
-  = Force
-  | CompareHashes
-
-render ∷ Context → Strategy → Render → Effect Context
-render ctx@{ pool } strategy r@{ above, below, workspace } = do
+render ∷ Context → Render → Effect Context
+render ctx@{ pool } r@{ above, below, workspace } = do
   physicalDimensions ← Dimensions.toNumbers <$> Double.physicalDimensions pool
   -- traceM "Cork.Render called"
-  case strategy of
-    Force → do
-      -- traceM "FORCE REDRAW"
-      { hash: currentHash, pool: _, zoom: ctx.zoom } <$> renderLayers physicalDimensions ctx.zoom pool r
-    -- | XXX: This should be done on layer level!
-    CompareHashes → case ctx.hash, currentHash of
-      Just prev, Just curr | prev == curr → do
-        -- traceM "SKIPPING"
-        pure ctx
-      _, _ → do
-        -- traceM "REDRAWING BECAUSE HASHES ARE DIFFERENT"
-        -- traceM ctx.hash
-        -- traceM currentHash
-        { hash: currentHash, pool: _, zoom: ctx.zoom } <$> renderLayers physicalDimensions ctx.zoom pool r
-    where
-      currentHash = Just <<<  hash $ (map drawHash above) /\ (map drawHash below) /\ (map drawHash workspace)
+  -- | We are not updating hash anymore.
+  -- | Hash should be provided by models and used in `nextStatus` method
+  { hash: ctx.hash, pool: _, zoom: ctx.zoom } <$> renderLayers physicalDimensions ctx.zoom pool r
+    -- | XXX: This should be done on the layer level!
+    -- CompareHashes → case ctx.hash, currentHash of
+    --   Just prev, Just curr | prev == curr → do
+    --     -- traceM "SKIPPING"
+    --     pure ctx
+    --   _, _ → do
+    --     -- traceM "REDRAWING BECAUSE HASHES ARE DIFFERENT"
+    --     -- traceM ctx.hash
+    --     -- traceM currentHash
+    --     { hash: currentHash, pool: _, zoom: ctx.zoom } <$> renderLayers physicalDimensions ctx.zoom pool r
+    -- where
+    --   currentHash = Just <<<  hash $ (map drawHash above) /\ (map drawHash below) /\ (map drawHash workspace)
 
 renderLayers ∷ Canvas.Dimensions → Zoom → Double.Pool → Render → Effect Double.Pool
 renderLayers dimensions zoom pool { above, below, workspace } = do
@@ -128,7 +122,12 @@ renderLayer ∷ Canvas.Dimensions → Zoom → CanvasElement → Array Draw → 
 renderLayer { height, width } (Zoom zoom) canvas draws = do
   ctx ← Canvas.getContext2D canvas
   resetTransform ctx
+  let
+    Vector pan = zoom.pan
+    t = (1.0 - 1.0 / zoom.ratio) / 2.0
   Canvas.scale ctx { scaleX: zoom.ratio, scaleY: zoom.ratio }
+  Canvas.translate ctx { translateX: -width * (t + pan.x), translateY: -height * (t + pan.y) }
+
   -- height ← Canvas.getCanvasHeight canvas
   -- width ← Canvas.getCanvasWidth canvas
   let

@@ -152,14 +152,14 @@ unfoldImageDataPlan workspace imageData build = case unroll imageData of
           c2 ← CanvasElement.clone c1
           Right <$> Blur.filter c1 c2 b i'
     in step hash process build i
-  Sprite.ClipImageBitmap hash path bb imageBitmap → unfoldImageBitmapPlan workspace imageBitmap \i →
+  Sprite.ClipImageBitmap hash path edgeStyle bb imageBitmap → unfoldImageBitmapPlan workspace imageBitmap \i →
     let
       process i' = Aff.bracket
         (AVar.Aff.take workspace)
         (flip AVar.Aff.put workspace)
         \w → liftEffect $ do
           path2D ← Path2D.new (Svg.Path.print path)
-          Right <$> ImageBitmap.clipToImageData w path2D bb i'
+          Right <$> ImageBitmap.clipToImageData w path2D edgeStyle bb i'
     in step hash process build i
   Sprite.FromImageBitmap hash bb imageBitmap → unfoldImageBitmapPlan workspace imageBitmap \i →
     let
@@ -190,7 +190,7 @@ unfoldImageDataPlan workspace imageData build = case unroll imageData of
       process i' = Aff.bracket
         (AVar.Aff.take workspace)
         (flip AVar.Aff.put workspace)
-        (\w → liftEffect $ Right <$> ImageBitmap.perspectiveToImageData w quad (TilesNumber 10) i')
+        (\w → liftEffect $ Right <$> ImageBitmap.perspectiveToImageData w quad (TilesNumber 5) i')
     in
       step hash process build i
   Sprite.StackedBlur hash radius imageData → unfoldImageDataPlan workspace imageData \i →
@@ -288,12 +288,15 @@ type CacheChange sprite =
 data Change
   = ImageDataChange (CacheChange Canvas.ImageData)
   | ImageBitmapChange (CacheChange Canvas.ImageBitmap)
+  | Done
 
 
--- machine ∷ Effect
---   { subscribe ∷ (Change → Effect Unit) → Effect (Effect Unit)
---   , load ∷ Draws → Effect Unit
---   }
+type Machine =
+  { process ∷ Draws → Effect Unit
+  , subscribe ∷ (Change → Effect Unit) → Effect (Effect Unit)
+  }
+
+machine ∷ Effect Machine
 machine = do
   canvas ← CanvasElement.new' $ Dimensions.unsafe { height: 1000.0, width: 1000.0 }
   workspace ← Effect.AVar.new canvas
@@ -315,22 +318,20 @@ machine = do
     subscribe handler = i.subscribe case _ of
       { action: CacheImageBitmap hash item, new } →
         let
-          change =
-            { done: Plan.null new.plan
-            , change: ImageBitmapChange { new: { hash, item }, cache: new.caches.imageBitmap }
-            }
-        in
+          change = ImageBitmapChange
+            { new: { hash, item }, cache: new.caches.imageBitmap }
+        in do
           handler change
+          when (Plan.null new.plan) (handler Done)
       { action: CacheImageData hash item, new } →
         let
-          change =
-            { done: Plan.null new.plan
-            , change: ImageDataChange
+          change = ImageDataChange
               { new: { hash, item }, cache: new.caches.imageData }
-            }
-        in
+        in do
           handler change
-      _ → pure unit
+          when (Plan.null new.plan) (handler Done)
+      { action: Load _ , new } → do
+        when (Plan.null new.plan) (handler Done)
 
     process draws = do
       i.push (Load draws)

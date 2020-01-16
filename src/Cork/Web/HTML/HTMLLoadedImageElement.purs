@@ -8,9 +8,12 @@ import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
 import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Hashable (class Hashable, hash)
+import Data.Maybe (fromJust)
+import Data.String.Utils (startsWith) as Data.String.Utils
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Compat (EffectFnAff, fromEffectFnAff)
+import Effect.Class (liftEffect)
 import Geometry (Distance)
 import Geometry.Distance (ConversionFactor)
 import Geometry.Distance.ConversionFactor (unsafe) as ConversionFactor
@@ -18,12 +21,12 @@ import Geometry.Plane.BoundingBox (Dimensions)
 import Geometry.Plane.BoundingBox.Dimensions (convert) as Dimensions
 import Graphics.Canvas (CanvasElement, drawImage, getContext2D)
 import Graphics.Canvas (CanvasImageSource) as Canvas
+import Partial.Unsafe (unsafePartial)
 import Seegee.Geometry.Distance.Units (Pixel, Screen) as Units
 import Unsafe.Coerce (unsafeCoerce)
-import Web.DOM (Node) as Web.DOM
-import Web.DOM.Node (clone) as Web.DOM.Node
+import Web.DOM.Element (getAttribute)
 import Web.HTML (HTMLElement, HTMLImageElement)
-import Web.HTML.HTMLElement (toNode) as HTMLElement
+import Web.HTML.HTMLElement (toElement) as HTMLElement
 import Web.HTML.HTMLImageElement (setHeight, setWidth, toHTMLElement) as HTMLImageElement
 
 type ImageDataURL = String
@@ -55,6 +58,13 @@ setSrc (DataURL src) img = fromEffectFnAff (setSrcImpl src img)
 setDataURLSrc ∷ ImageDataURL → HTMLLoadedImageElement → Aff Unit
 setDataURLSrc src img = fromEffectFnAff (setSrcImpl src img)
 
+getSrc ∷ HTMLLoadedImageElement → Effect Source
+getSrc img = do
+  rawSrc ← unsafePartial (fromJust <$> getAttribute "src" (HTMLElement.toElement (toHTMLElement img)))
+  pure $ if (Data.String.Utils.startsWith "data" rawSrc)
+    then DataURL rawSrc
+    else URL rawSrc
+
 foreign import newImpl ∷ String → EffectFnAff HTMLLoadedImageElement
 
 new ∷ Source → Aff HTMLLoadedImageElement
@@ -64,11 +74,10 @@ new (DataURL src) = fromEffectFnAff (newImpl src)
 -- | Ensure HTMLImageElement is loaded
 -- load ∷ HTMLImageElement → Aff HTMLLoadedImageElement
 
-clone ∷ HTMLLoadedImageElement → Effect HTMLLoadedImageElement
-clone = map unsafeFromNode <<< Web.DOM.Node.clone <<< HTMLElement.toNode <<< HTMLImageElement.toHTMLElement <<< toHTMLImageElement
-  where
-    unsafeFromNode ∷ Web.DOM.Node → HTMLLoadedImageElement
-    unsafeFromNode = unsafeCoerce
+clone ∷ HTMLLoadedImageElement → Aff HTMLLoadedImageElement
+clone img = do
+  src ← liftEffect (getSrc img)
+  new src
 
 -- | We don't really want to start the path into "discrate geometry"
 -- | Browsers are able to deal with floats in case of this props:

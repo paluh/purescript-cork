@@ -15,6 +15,8 @@ import Seegee.Geometry.Distance.Units (Pixel) as Units
 
 foreign import clearRect ∷ Context2D → BoundingBox Units.Pixel → Effect Unit
 
+foreign import imageSmoothingEnabled ∷ Context2D → Boolean → Effect Unit
+
 foreign import clipPath2DImpl ∷ EffectFn3 Context2D Path2D String Unit
 
 -- | "nonzero" is default value used by clip.
@@ -27,8 +29,9 @@ clipPath ctx path = case _ of
   NonZero → runEffectFn3 clipPath2DImpl ctx path "nonzero"
   EvenOdd → runEffectFn3 clipPath2DImpl ctx path "evenodd"
 
-foreign import resetTransform ∷ Context2D → Effect Unit
+foreign import fillPath2D ∷ Context2D → Path2D → Effect Unit
 
+foreign import resetTransform ∷ Context2D → Effect Unit
 
 foreign import fillQuadTexImpl ∷ EffectFn4 Context2D (Quadrilateral Units.Pixel) (Quadrilateral Units.Pixel) TilesNumber Unit
 
@@ -42,7 +45,7 @@ drawImagePerspective
   → TilesNumber
   → Effect Unit
 drawImagePerspective context img src dest tilesNumber = do
-  pattern ← createPattern context img NoRepeat
+  pattern ← createPattern context img Repeat
   setPatternFillStyle context pattern
   runEffectFn4 fillQuadTexImpl
     context

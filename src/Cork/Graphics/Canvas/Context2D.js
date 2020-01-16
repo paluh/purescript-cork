@@ -14,8 +14,24 @@ exports.clearRect = function(ctx) {
   };
 };
 
+exports.imageSmoothingEnabled = function(ctx) {
+  return function(b) {
+    return function() {
+      ctx.imageSmoothingEnabled = b;
+    };
+  };
+};
+
 exports.clipPath2DImpl = function(ctx, path2D, fillingRule) {
   ctx.clip(path2D, fillingRule);
+};
+
+exports.fillPath2D = function(ctx) {
+  return function(path2D) {
+    return function() {
+      ctx.fill(path2D);
+    };
+  };
 };
 
 exports.resetTransform = function(ctx) {
@@ -34,7 +50,7 @@ exports.fillQuadTexImpl = function(ctx, src, dst, tiles) {
   var srcRowCol = function(r, c) { return exports.projectPoint({ x: c / tiles, y: r / tiles }, projectionSrc); };
   var dstRowCol = function(r, c) { return exports.projectPoint({ x: c / tiles, y: r / tiles }, projectionDst); };
 
-  var pad = 0.03; // we add padding to remove tile seams
+  var pad = 0.1; // we add padding to remove tile seams
 
   var topTri = function(r, c, p) { return [
     /*

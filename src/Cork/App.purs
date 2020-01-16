@@ -15,7 +15,6 @@ import Prelude
 import Cork.Graphics.Canvas.CanvasElement (Dimensions, ImageRendering(..)) as CanvasElement
 import Cork.Graphics.Canvas.Pool.Double (append, new, physicalDimensions, setDimensions, setImageRendering, setLogicalDimensions) as Double
 import Cork.Render (Render, Context, render) as Render
-import Cork.Render (Strategy(..))
 import Cork.Render.Zoom (Zoom(..))
 import Data.Const (Const)
 import Data.Foldable (for_)
@@ -30,7 +29,8 @@ import Spork.EventQueue as EventQueue
 import Spork.Interpreter (Interpreter(..))
 import Spork.Transition (Transition)
 import Unsafe.Reference (unsafeRefEq)
-import Web.HTML (HTMLElement)
+import Web.HTML (HTMLElement, window)
+import Web.HTML.Window (requestAnimationFrame)
 
 -- | A specification for a Spork app:
 -- |    * `render` - Renders a model to `Cork.Render.Render`
@@ -61,6 +61,7 @@ type AppInstance model action =
   , run ∷ Effect Unit
   , snapshot ∷ Effect model
   , restore ∷ model → Effect Unit
+  , setZoom ∷ Zoom → Effect Unit
   , setDimensions ∷ CanvasElement.Dimensions → Effect Unit
   , subscribe ∷ (AppChange model action → Effect Unit) → Effect (Effect Unit)
   }
@@ -78,6 +79,7 @@ data AppAction m q s i
   | Render
   | Restore s
   | SetDimensions CanvasElement.Dimensions
+  | SetZoom Zoom
 
 data RenderStatus
   = NoChange
@@ -93,6 +95,9 @@ type AppState m q s i =
   , renderContext ∷ Render.Context
   }
 
+makeImmediate ∷ Effect Unit → Effect Unit
+makeImmediate run = void $ window >>= requestAnimationFrame run
+
 makeAppQueue
   ∷ ∀ m q s i
   . (AppChange s i → Effect Unit)
@@ -103,14 +108,16 @@ makeAppQueue
   → EventQueue Effect (AppAction m q s i) (AppAction m q s i)
 makeAppQueue onChange (Interpreter interpreter) app cfg = EventQueue.withAccum \self → do
   let
-    schedule = self.push Render *> self.run
+    schedule = makeImmediate (self.push Render *> self.run)
     pushAction = self.push <<< Action
     pushEffect = self.push <<< Interpret <<< left
 
     nextStatus ∷ s → s → RenderStatus → RenderStatus
     nextStatus prevModel nextModel = case _ of
       NoChange
-        | unsafeRefEq prevModel nextModel → NoChange
+        | unsafeRefEq prevModel nextModel
+        -- (Just <<<  hash $ (map drawHash above) /\ (map drawHash below) /\ (map drawHash workspace)
+        → NoChange
         | otherwise → Pending
       Flushed → NoChange
       Pending → Pending
@@ -135,6 +142,7 @@ makeAppQueue onChange (Interpreter interpreter) app cfg = EventQueue.withAccum \
       Interpret m → do
         nextInterpret ← k m
         pure $ state { interpret = nextInterpret }
+
       Action i → do
         let
           next = app.update state.renderContext state.model i
@@ -144,28 +152,34 @@ makeAppQueue onChange (Interpreter interpreter) app cfg = EventQueue.withAccum \
         onChange appChange
         foreachE (unBatch next.effects) pushEffect
         pure nextState
+
+      Append parent → do
+        Double.append state.renderContext.pool parent
+        pure $ state { status = Pending }
+
+      Render → do
+        renderContext' ← Render.render state.renderContext (app.render state.model)
+        pure $ state { status = Flushed, renderContext = renderContext' }
+
       Restore nextModel → do
         let
           status = nextStatus state.model nextModel state.status
           nextState = state { model = nextModel, status = status }
         pure nextState
-      Append parent → do
-        Double.append state.renderContext.pool parent
-        pure state
-      Render → render state CompareHashes
+
       SetDimensions dimensions → do
         physicalDimensions ← Double.physicalDimensions state.renderContext.pool
         if (physicalDimensions /= dimensions.physical)
           then do
             Double.setDimensions dimensions state.renderContext.pool
-            render state Force
+            pure $ state { status = Pending }
           else do
             Double.setLogicalDimensions dimensions.logical state.renderContext.pool
             pure state
 
-    render state strategy = do
-      renderContext' ← Render.render state.renderContext strategy (app.render state.model)
-      pure $ state { status = Flushed, renderContext = renderContext' }
+      SetZoom zoom → pure $ if (zoom /= state.renderContext.zoom)
+          then state { status = Pending, renderContext { zoom = zoom }}
+          else state
 
     commit
       ∷ AppState m q s i
@@ -195,7 +209,7 @@ makeAppQueue onChange (Interpreter interpreter) app cfg = EventQueue.withAccum \
   interpret ← interpreter (self { push = self.push <<< Action })
   foreachE (unBatch app.init.effects) pushEffect
   pool ← Double.new cfg.dimensions
-  Double.setImageRendering CanvasElement.Pixelated pool
+  -- Double.setImageRendering CanvasElement.Pixelated pool
   let
     init =
       { model: app.init.model
@@ -264,6 +278,7 @@ make interpreter app cfg = do
     , run
     , snapshot: Ref.read stateRef
     , subscribe: subscribe'
+    , setZoom: push <<< SetZoom
     , setDimensions: push <<< SetDimensions
     }
 

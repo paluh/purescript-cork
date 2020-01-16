@@ -13,6 +13,7 @@ module Cork.Sprites.Sprite
 
 import Prelude
 
+import Cork.Graphics.Canvas.ImageBitmap.Clip (EdgeStyle)
 import Cork.Graphics.Canvas.ImageData.Immutable.Filters.Blur (Blur) as Blur
 import Cork.Graphics.Canvas.ImageData.Mutable.Filters.Grayscale (Mode) as Grayscale
 import Cork.Hashable (boundingBox, path, quadrilateral) as Cork.Hashable
@@ -33,7 +34,7 @@ import Seegee.Geometry.Distance.Units (Pixel) as Units
 
 data ImageDataF r
   = Blur Hash Blur.Blur r
-  | ClipImageBitmap Hash (Svg.Path Units.Pixel) (Maybe (BoundingBox Units.Pixel)) (ImageBitmapF r)
+  | ClipImageBitmap Hash (Svg.Path Units.Pixel) EdgeStyle (Maybe (BoundingBox Units.Pixel)) (ImageBitmapF r)
   | FromImageBitmap Hash (Maybe (BoundingBox Units.Pixel)) (ImageBitmapF r)
   | Grayscale Hash Grayscale.Mode r
   | GrayscaleToAlpha Hash Grayscale.Mode r
@@ -46,7 +47,7 @@ instance eq1ImageDataF ∷ Eq1 ImageDataF where
 
 instance foldableImageDataF ∷ Foldable ImageDataF where
   foldMap f (Blur _ _ r) = f r
-  foldMap f (ClipImageBitmap _ _ _ i) = foldMap f i
+  foldMap f (ClipImageBitmap _ _ _ _ i) = foldMap f i
   foldMap f (FromImageBitmap _ _ i) = foldMap f i
   foldMap f (Grayscale _ _ r) = f r
   foldMap f (GrayscaleToAlpha _ _ r) = f r
@@ -58,7 +59,7 @@ instance foldableImageDataF ∷ Foldable ImageDataF where
 
 instance traversableImageDataF ∷ Traversable ImageDataF where
   sequence (Blur h b i) = Blur h b <$> i
-  sequence (ClipImageBitmap h p bb i) = ClipImageBitmap h p bb <$> sequence i
+  sequence (ClipImageBitmap h p e bb i) = ClipImageBitmap h p e bb <$> sequence i
   sequence (FromImageBitmap h bb i) = FromImageBitmap h bb <$> sequence i
   sequence (Grayscale h m i) = Grayscale h m <$> i
   sequence (GrayscaleToAlpha h m i) = GrayscaleToAlpha h m <$> i
@@ -69,7 +70,7 @@ instance traversableImageDataF ∷ Traversable ImageDataF where
 
 instance hashableImageDataF ∷ (Eq r) ⇒ Hashable (ImageDataF r) where
   hash (Blur h _ _) = h
-  hash (ClipImageBitmap h _ _ _) = h
+  hash (ClipImageBitmap h _ _ _ _) = h
   hash (FromImageBitmap h _ _) = h
   hash (Grayscale h _ _) = h
   hash (GrayscaleToAlpha h _ _) = h
@@ -106,8 +107,8 @@ type ImageBitmap = ImageBitmapF ImageData
 blur ∷ Blur.Blur → ImageData → ImageData
 blur b t@(In i) = roll $ Blur (Hashable.hash ("blur" /\ b /\ i)) b t
 
-clip ∷ Svg.Path Units.Pixel → Maybe (BoundingBox Units.Pixel) → ImageBitmap → ImageData
-clip path bb i = roll $ ClipImageBitmap h path bb i
+clip ∷ Svg.Path Units.Pixel → EdgeStyle → Maybe (BoundingBox Units.Pixel) → ImageBitmap → ImageData
+clip path e bb i = roll $ ClipImageBitmap h path e bb i
   where
     h = case bb of
       Nothing → hash ("clip" /\ Cork.Hashable.path path /\ i)

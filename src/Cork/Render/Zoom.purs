@@ -7,6 +7,7 @@ import Geometry.Plane.Vector (scale) as Vector
 
 type Ratio = Number
 newtype Zoom = Zoom { pan ∷ Vector, ratio ∷ Ratio }
+derive instance eqZoom ∷ Eq Zoom
 
 instance semigroupZoom ∷ Semigroup Zoom where
   append (Zoom z1@{ pan: Vector p1 }) (Zoom z2@{ pan: Vector p2 }) = Zoom

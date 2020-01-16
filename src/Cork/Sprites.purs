@@ -14,6 +14,7 @@ import Cork.Graphics.Canvas.CanvasElement (Dimensions) as CanvasElement
 import Cork.Graphics.Canvas.ImageBitmap (ImageBitmap)
 import Cork.Render (Draw, Render, Context) as Render
 import Cork.Render.Types (DrawCanvasImageSourceF(..), DrawF(..), DrawImageDataF(..))
+import Cork.Render.Zoom (Zoom)
 import Cork.Sprites.Caches (Cache, Caches, imageBitmapL, imageDataL)
 import Cork.Sprites.Caches.Machine (Change(..), Draw, Draws)
 import Cork.Sprites.Caches.Machine (Change(..), drawImage, drawImageData, drawImagePerspective, drawImageScale, Draw, Draws, putImageData) as Exports
@@ -125,10 +126,11 @@ update renderContext model = case _ of
 
 type Machine =
   { append ∷ HTMLElement → Effect Unit
-  , render
-    ∷ { scene ∷ Scene
-      , dimensions ∷ CanvasElement.Dimensions
+  , render ∷
+      { dimensions ∷ CanvasElement.Dimensions
       , done ∷ Maybe (Scene → Effect Unit)
+      , scene ∷ Scene
+      , zoom ∷ Zoom
       }
     → Effect Unit
   , run ∷ Effect Unit
@@ -150,27 +152,38 @@ machine config = do
   i ← Cork.App.make (basicEffect `Interpreter.merge` basicEffect) app config
   cachesMachine ← Caches.Machine.machine
 
-  let
-    whenDone done = when done $ i.snapshot >>= \m → case m.done of
+  void $ cachesMachine.subscribe case _ of
+    ImageDataChange change → do
+      i.push (SetImageDataCache change.cache)
+      i.run
+
+    ImageBitmapChange change → do
+      i.push (SetImageBitmapCache change.cache)
+      i.run
+
+    Done → i.snapshot >>= \m → case m.done of
       Just callback → callback m.scene
       Nothing → pure unit
 
-  void $ cachesMachine.subscribe case _ of
-    { done, change: ImageDataChange change } → do
-      whenDone done
-      i.push (SetImageDataCache change.cache)
-      i.run
-    { done, change: ImageBitmapChange change } → do
-      whenDone done
-      i.push (SetImageBitmapCache change.cache)
-      i.run
   let
-    renderScene { dimensions, done, scene } = do
+    renderScene { dimensions, done, scene, zoom } = do
+      -- | We probably don't have to check dimensions change here
+      -- | as the same could be done on app level
       whenM (i.snapshot <#> _.dimensions >>> eq dimensions >>> not) $
         i.setDimensions dimensions
-      cachesMachine.process (scene.above <> scene.below <> scene.workspace)
+      i.setZoom zoom
       i.push (Load { done, scene })
       i.run
+      -- | I should keep cache status
+      -- | in state probably and this machine too.
+      -- | Then I would be able to
+      -- | sync this submachine with state
+      -- | transitions easily.
+      -- | Now I created this strange order
+      -- | so when empty scene is loaded
+      -- | we have `done` handler already
+      -- | in state...
+      cachesMachine.process (scene.above <> scene.below <> scene.workspace)
   pure
     { append: \a → i.append a *> i.run
     , render: renderScene

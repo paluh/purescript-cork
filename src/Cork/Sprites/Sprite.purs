@@ -79,6 +79,7 @@ instance hashableImageDataF ∷ (Eq r) ⇒ Hashable (ImageDataF r) where
 
 data ImageBitmapF r
   = ExternalImage Hash HTMLLoadedImageElement.Source
+  -- | SvgImage Hash 
   | FromImageData Hash (ImageDataF r)
 derive instance functorImageBitmapF ∷ Functor ImageBitmapF
 derive instance eqImageBitmapF ∷ (Eq r) ⇒ Eq (ImageBitmapF r)

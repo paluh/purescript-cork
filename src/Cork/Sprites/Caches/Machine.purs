@@ -2,6 +2,7 @@ module Cork.Sprites.Caches.Machine where
 
 import Prelude
 
+import Control.Monad.Error.Class (catchError)
 import Cork.Data.Array.Builder (build, cons) as Array.Builder
 import Cork.Graphics.Canvas (ImageBitmap) as Canvas
 import Cork.Graphics.Canvas (TilesNumber(..))
@@ -44,11 +45,13 @@ import Effect.Aff (bracket) as Aff
 import Effect.Aff.AVar (AVar)
 import Effect.Aff.AVar (new, put, take) as AVar.Aff
 import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
 import Effect.Ref (new, read, write) as Ref
 import Geometry.Plane.BoundingBox (BoundingBox)
 import Geometry.Plane.BoundingBox.Dimensions (unsafe) as Dimensions
 import Geometry.Plane.Figures.Polygons.Quadrilateral (Quadrilateral)
 import Geometry.Plane.Point (Point)
+import Global.Unsafe (unsafeStringify)
 import Graphics.Canvas (CanvasElement)
 import Graphics.Canvas (ImageData) as Canvas
 import Seegee.Geometry.Distance.Units (Pixel) as Units
@@ -126,7 +129,16 @@ unfoldImageBitmapPlan
 unfoldImageBitmapPlan workspace imageBitmap build = case imageBitmap of
   Sprite.ExternalImage hash url →
     Plan mempty
-      (Map.singleton hash (Tuple (Right <$> ImageBitmap.fromSource url) build))
+      (Map.singleton hash (Tuple ib build))
+    where
+      ib = do
+        log ("LOADING IMAGE:" <> unsafeStringify url)
+        r ← (Right <$> ImageBitmap.fromSource url) `catchError` (unsafeStringify >>> Left >>> pure)
+        log "RESULT:"
+        case r of
+          Left e → log $ "ERROR" <> e
+          Right _ → log $ "IMAGE LOAEDED"
+        pure r
   Sprite.FromImageData hash imageData → unfoldImageDataPlan workspace (roll imageData) \i →
     let
       process = do

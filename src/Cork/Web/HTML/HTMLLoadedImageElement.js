@@ -16,6 +16,9 @@ exports.setSrcImpl = function(src) {
       img.onload = function() {
         onSuccess(img);
       };
+      img.onerror = function(e) {
+        onError(e);
+      };
       img.src = src;
       return function (cancelError, cancelerError, cancelerSuccess) {
         cancelError();

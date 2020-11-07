@@ -2,19 +2,23 @@ module Cork.Svg.Transform where
 
 import Prelude
 
+import Data.Maybe (Maybe)
 import Geometry (Angle)
-import Geometry.Plane (Point)
+import Geometry.Numbers (NonNegative) as Numbers
+import Geometry.Plane (Point, Translation)
+import Geometry.Plane.Transformations.Isometries.Translation (position')
 import Seegee.Geometry.Distance.Units (Scene) as Units
 
 data Transform
-  = Rotate { angle ∷ Angle, center ∷ Point Units.Scene }
-  -- | Translate (Translation Units.Scene)
-  -- | Scale { x ∷ Number, y ∷ Number }
-  -- | SkewX Number
-  -- | SkewY Number
-  | Cons Transform Transform
-  -- | Matrix 
+  = Rotate Angle (Maybe (Point Units.Scene))
+  | Translate (Translation Units.Scene)
+  | Scale Numbers.NonNegative Numbers.NonNegative
+  | SkewX Angle
+  | SkewY Angle
+  | Transforms Transform Transform
 
 instance semigroupTransform ∷ Semigroup Transform where
-  append a b = Cons a b
+  append a b = Transforms a b
 
+translate ∷ Number → Number → Transform
+translate x y = Translate (position' x y)

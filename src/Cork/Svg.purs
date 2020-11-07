@@ -1,24 +1,27 @@
 module Cork.Svg
-  ( module Types
-  , render
+  ( render
   , render'
+  , module Attributes
+  , module Transform
+  , module Types
   ) where
 
 import Prelude
-import Cork.Svg.Attributes (viewBox) as Attributes
+import Cork.Svg.Attributes (transform, viewBox) as Attributes
 import Cork.Svg.Types (Document(..), Render(..))
+import Cork.Svg.Transform (Transform(..)) as Transform
 import Cork.Svg.Types (Document(..), Render(..)) as Types
 import Data.Maybe (Maybe(..))
 import Geometry (Distance(..))
 import Geometry.Distance (ConversionFactor)
-import Geometry.Distance (convert, toNumber) as Distance
+import Geometry.Distance (convert) as Distance
 import Geometry.Plane.BoundingBox (BoundingBox(..))
 import Seegee.Geometry.Distance.Units (Pixel, Scene) as Units
 import Text.Smolder.Markup ((!))
 import Text.Smolder.Markup (Attribute, attribute) as M
 import Text.Smolder.Renderer.String (render) as Smolder
 import Text.Smolder.SVG (defs, svg) as M
-import Text.Smolder.SVG.Attributes (baseProfile, height, overflow, style, version, viewBox, width) as A
+import Text.Smolder.SVG.Attributes (baseProfile, height, overflow, version, viewBox, width) as A
 
 -- | XXX: We want to drop Smoler dependency probably
 -- | and move this all helpers to Units.React.Basic.DOM.Svg
@@ -32,8 +35,6 @@ render (Document { body, defs, viewBox: viewBox@(BoundingBox viewBoxV) }) mRatio
     Smolder.render $ M.svg
       ! A.viewBox (Attributes.viewBox viewBox)
       ! A.overflow "hidden"
-      -- ! A.style "width:100%;height:100%"
-      
       ! case mRatio of
           -- | When we use 100% as width value it seems that there is no clipping.
           -- | 

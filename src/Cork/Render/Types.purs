@@ -13,7 +13,7 @@ import Data.Newtype (class Newtype)
 import Data.Traversable (class Traversable, traverseDefault)
 import Geometry.Plane (BoundingBox, Point)
 import Geometry.Plane.Figures.Polygons.Quadrilateral (Quadrilateral)
-import Geometry.Plane.Transformations.Isometries.Translation (Translation(..))
+import Geometry.Plane.Transformations.Affine.Isometries.Translation (Translation(..))
 import Graphics.Canvas (Composite(..)) as Canvas
 import Seegee.Geometry.Distance.Units (Pixel) as Units
 

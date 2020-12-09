@@ -67,9 +67,6 @@ render model =
   , workspace: renderDraws model.scene.workspace
   }
   where
-    -- x = do
-    --   traceM "Sprites.Render called"
-    --   Nothing
     renderDraws = catMaybes <<< map (renderDraw model.caches)
 
 renderDraw ∷ Caches → Draw → Maybe Render.Draw
@@ -168,7 +165,7 @@ machine config = do
   let
     renderScene { dimensions, done, scene, zoom } = do
       -- | We probably don't have to check dimensions change here
-      -- | as the same could be done on app level
+      -- | as the same could be done on the app level
       whenM (i.snapshot <#> _.dimensions >>> eq dimensions >>> not) $
         i.setDimensions dimensions
       i.setZoom zoom

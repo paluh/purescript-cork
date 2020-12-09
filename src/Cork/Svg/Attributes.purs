@@ -12,7 +12,7 @@ import Geometry.Angle (toDegrees)
 import Geometry.Numbers.NonNegative (NonNegative(..))
 import Geometry.Plane (Point(..), Vector(..))
 import Geometry.Plane.BoundingBox (BoundingBox(..))
-import Geometry.Plane.Transformations.Isometries.Translation (Translation(..))
+import Geometry.Plane.Transformations.Affine.Isometries.Translation (Translation(..))
 import Seegee.Color (Color)
 import Seegee.Geometry.Distance.Units (Scene) as Units
 

@@ -10,7 +10,7 @@ import Geometry.Plane.Figures.Polygons.Quadrilateral (Quadrilateral)
 import Graphics.Canvas (CanvasImageSource, Context2D, PatternRepeat(..), createPattern, setPatternFillStyle)
 import Seegee.Geometry.Distance.Units (Pixel) as Units
 
--- | Provide "primitive" drawing extensions here (based on canvas image source etc).
+-- | Provide "primitive" drawing extensions here (based on canvas, image source etc).
 -- | We don't want to depend on any module from `Cork.Graphics.Canvas` here.
 
 foreign import clearRect ∷ Context2D → BoundingBox Units.Pixel → Effect Unit

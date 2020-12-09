@@ -6,7 +6,7 @@ import Data.Maybe (Maybe)
 import Geometry (Angle)
 import Geometry.Numbers (NonNegative) as Numbers
 import Geometry.Plane (Point, Translation)
-import Geometry.Plane.Transformations.Isometries.Translation (position')
+import Geometry.Plane.Transformations.Affine.Isometries.Translation (position')
 import Seegee.Geometry.Distance.Units (Scene) as Units
 
 data Transform

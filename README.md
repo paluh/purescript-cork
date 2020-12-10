@@ -2,8 +2,13 @@
 
 Simple experimental canvas renderer which reuses spork primitives and provides its own `App` type.
 
+Still WIP - battle testing in the current project.
+
+## Usage
+
 `Cork.Sprites` is sprites rendering and caching app. I'm going to provide full working examples soon...
 
+<!--
 ## Extensions
 
 ### Full DAG
@@ -36,3 +41,4 @@ type Nodes = (a ∷ A, b ∷ B, c ∷ C)
 nodeA ∷ Tuple (f a) (a → Plan)
 ```
 
+-->

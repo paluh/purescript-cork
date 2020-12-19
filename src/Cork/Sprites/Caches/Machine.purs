@@ -2,7 +2,7 @@ module Cork.Sprites.Caches.Machine where
 
 import Prelude
 
-import Control.Monad.Error.Class (catchError)
+import Control.Monad.Error.Class (catchError, throwError)
 import Cork.Data.Array.Builder (build, cons) as Array.Builder
 import Cork.Graphics.Canvas (ImageBitmap) as Canvas
 import Cork.Graphics.Canvas (TilesNumber(..))
@@ -25,6 +25,7 @@ import Cork.Sprites.Caches.Types (Cache, Item, Caches)
 import Cork.Sprites.Sprite (ImageBitmap, ImageBitmapF(..), ImageData, ImageDataF(..)) as Sprite
 import Cork.Sprites.Sprite (fromImageData)
 import Cork.Svg.Path (print) as Svg.Path
+import Cork.Web.HTML.HTMLLoadedImageElement (Source(..))
 import Data.Array (catMaybes)
 import Data.Array (elem) as Array
 import Data.Bifunctor (bimap)
@@ -132,20 +133,27 @@ unfoldImageBitmapPlan workspace imageBitmap build = case imageBitmap of
       (Map.singleton hash (Tuple ib build))
     where
       ib = do
-        log ("LOADING IMAGE:" <> unsafeStringify url)
+        let
+          repr = case url of
+            URL u → u
+            otherwise → "<source>"
+        traceM $ "ExternalImage " <> repr
         r ← (Right <$> ImageBitmap.fromSource url) `catchError` (unsafeStringify >>> Left >>> pure)
-        log "RESULT:"
         case r of
           Left e → log $ "ERROR" <> e
-          Right _ → log $ "IMAGE LOAEDED"
+          Right _ → log $ "Succeeded."
         pure r
   Sprite.FromImageData hash imageData → unfoldImageDataPlan workspace (roll imageData) \i →
     let
       process = do
         Aff.bracket
           (AVar.Aff.take workspace)
-          (flip AVar.Aff.put workspace)
-          (\w → traverse (ImageBitmap.fromAnyImageData w) (Immutable <$> i))
+          (\c → do
+              AVar.Aff.put c workspace
+          )
+          (\w → do
+            traverse (ImageBitmap.fromAnyImageData w) (Immutable <$> i)
+          )
     in
       Plan mempty (Map.singleton hash (Tuple process build))
 
@@ -154,7 +162,12 @@ unfoldImageDataPlan
   → Sprite.ImageData
   → (Item Canvas.ImageData → DrawingPlan)
   → DrawingPlan
-unfoldImageDataPlan workspace imageData build = case unroll imageData of
+unfoldImageDataPlan workspace imageData build =
+  let
+    x = do
+      traceM imageData
+      Nothing
+  in case unroll imageData of
   Sprite.Blur hash b imageData → unfoldImageDataPlan workspace imageData \i →
     let
       process i' = Aff.bracket
@@ -175,15 +188,21 @@ unfoldImageDataPlan workspace imageData build = case unroll imageData of
     in step hash process build i
   Sprite.FromImageBitmap hash bb imageBitmap → unfoldImageBitmapPlan workspace imageBitmap \i →
     let
-      process i' = Aff.bracket
-        (AVar.Aff.take workspace)
-        (flip AVar.Aff.put workspace)
-        (\w → liftEffect $ Right <$> ImageBitmap.toImageData w bb i')
+      process i' = do
+        traceM "FromImageBitmap"
+        Aff.bracket
+          (AVar.Aff.take workspace)
+          (flip AVar.Aff.put workspace)
+          (\w → do
+            traceM "Succeeded"
+            liftEffect $ Right <$> ImageBitmap.toImageData w bb i'
+          )
     in step hash process build i
   Sprite.Grayscale hash mode imageData → unfoldImageDataPlan workspace imageData \i →
     let
-      -- process = onError (const $ "Grayscale") $ liftEffect do
-      process i' = liftEffect do
+      onError label = flip catchError (\err → traceM (label <> ".Error :" <> unsafeStringify err) *> throwError err)
+      process i' = onError "Grayscale" $ liftEffect do
+      -- process i' = liftEffect do
         mutable ← ImageData.Mutable.thaw i'
         Grayscale.filter mode mutable
         Right <$> ImageData.Mutable.unsafeFreeze mutable
@@ -192,6 +211,7 @@ unfoldImageDataPlan workspace imageData build = case unroll imageData of
     let
       -- process i' = onError (const $ "GrayscaleToAlpha") $ liftEffect do
       process i' = liftEffect do
+        traceM "GrayscaleToAlpha"
         mutable ← ImageData.Mutable.thaw i'
         GrayscaleToAlpha.filter mode mutable
         Right <$> ImageData.Mutable.unsafeFreeze mutable
@@ -216,8 +236,21 @@ unfoldImageDataPlan workspace imageData build = case unroll imageData of
   where
     step ∷ ∀ i. Hash → (i → Aff (Item Canvas.ImageData)) → _ → Item i → _
     step hash process cont = case _ of
-      (Right imageData) → Plan (Map.singleton hash (Tuple (process imageData) cont)) mempty
-      (Left err) → Plan (Map.singleton hash (Tuple (pure (Left err)) cont)) mempty
+      (Right imageData) →
+        let
+          x = do
+            traceM "ImageData step succeeded."
+            Nothing
+        in
+          Plan (Map.singleton hash (Tuple (process imageData) cont)) mempty
+      (Left err) →
+        let
+          x = do
+            traceM "Step error"
+            traceM err
+            Nothing
+        in
+          Plan (Map.singleton hash (Tuple (pure (Left err)) cont)) mempty
 
 data Action
   = CacheImageData Hash (Item Canvas.ImageData)
@@ -248,10 +281,10 @@ update model = case _ of
       imageData = Map.insert hash item model.caches.imageData
       { subplan, plan } = Plan.step hash (Left item) model.plan
       effects = layerEffects subplan
-      -- x = do
-      --   traceM "New image data"
-      --   traceM hash
-      --   Nothing
+      x = do
+        traceM "New image data"
+        traceM hash
+        Nothing
     in
       { model:
         { caches: model.caches { imageData = imageData }
@@ -265,10 +298,10 @@ update model = case _ of
       imageBitmap = Map.insert hash item model.caches.imageBitmap
       { subplan, plan } = Plan.step hash (Right item) model.plan
       effects = layerEffects subplan
-      -- x = do
-      --   traceM "New image bitmap"
-      --   traceM hash
-      --   Nothing
+      x = do
+        traceM "New image bitmap"
+        traceM hash
+        Nothing
     in
       { model:
         { caches: model.caches { imageBitmap = imageBitmap }
@@ -283,7 +316,11 @@ update model = case _ of
       let
         stepImageData hash process =
           Array.Builder.cons $ do
-            item ← process
+            traceM "Processing image data..."
+            item ← process `catchError` \e → do
+              traceM $ "Processing image data error: " <> unsafeStringify e
+              throwError e
+            traceM "Processing image data succeeded."
             pure (CacheImageData hash item)
         stepImageBitmap hash process =
           Array.Builder.cons $ do

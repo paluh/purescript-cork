@@ -28,6 +28,7 @@ import Data.Lens (Lens', set)
 import Data.Lens.Record (prop)
 import Data.Map (lookup) as Map
 import Data.Maybe (Maybe(..))
+import Debug.Trace (traceM)
 import Effect (Effect)
 import Graphics.Canvas (ImageData)
 import Record (insert) as Record
@@ -151,10 +152,12 @@ machine config = do
 
   void $ cachesMachine.subscribe case _ of
     ImageDataChange change → do
+      traceM "Received: ImageDataChange"
       i.push (SetImageDataCache change.cache)
       i.run
 
     ImageBitmapChange change → do
+      traceM "Received: ImageBitmapChange"
       i.push (SetImageBitmapCache change.cache)
       i.run
 

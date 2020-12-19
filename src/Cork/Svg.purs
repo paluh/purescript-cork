@@ -10,7 +10,7 @@ import Prelude
 import Cork.Svg.Attributes (transform, viewBox) as Attributes
 import Cork.Svg.Types (Document(..), Render(..))
 import Cork.Svg.Transform (Transform(..)) as Transform
-import Cork.Svg.Types (Document(..), Render(..)) as Types
+import Cork.Svg.Types (Defs, Document(..), Render(..)) as Types
 import Data.Maybe (Maybe(..))
 import Geometry (Distance(..))
 import Geometry.Distance (ConversionFactor)

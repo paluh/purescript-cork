@@ -42,6 +42,7 @@ exports.resetTransform = function(ctx) {
 
 
 // https://beta.observablehq.com/@shaunlebron/texture-drawing-for-html-canvas
+// https://github.com/janpaul123/paperprograms/blob/c978bdabedbe4f8cf29cdb12f19bf03f6dd48b49/client/paper/canvasUtils.js
 exports.fillQuadTexImpl = function(ctx, src, dst, tiles) {
   tiles = tiles || 10;
 

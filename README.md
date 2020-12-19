@@ -10,7 +10,8 @@ Still WIP - battle testing in the current project.
 
 ## Credits
 
-I've used `<Ctrl-C><Ctrl-V>` a lot. I've included some filters from _konva_. I've included perspective transformation from _paperprograms_ and of course I've used a lot of pieces (beside depending on it) from _spork_.
+I've done a lot of `<Ctrl-C><Ctrl-V>` driven developement here. I've included most filters from _konva_. I've included perspective transformation from _paperprograms_ and of course I've used a lot of pieces (beside depending on it) from _spork_.
+
 I hope that I've listed all authors in the LICENSE file correctly... Please inform if it that is not the case.
 
 

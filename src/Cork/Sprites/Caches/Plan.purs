@@ -2,6 +2,7 @@ module Cork.Sprites.Caches.Plan where
 
 import Prelude
 
+import Control.Alternative (empty)
 import Data.Either (Either(..))
 import Data.Foldable (null) as Foldable
 import Data.FoldableWithIndex (foldMapWithIndex)
@@ -25,7 +26,7 @@ instance semigroupPlan ∷ Ord hash ⇒ Semigroup (Plan hash f i j) where
       union (Tuple i cont1) (Tuple _ cont2) = Tuple i (append <$> cont1 <*> cont2)
 
 instance monoidPlan ∷ Ord hash ⇒ Monoid (Plan hash f i j) where
-  mempty = Plan mempty mempty
+  mempty = Plan empty empty
 
 null ∷ ∀ hash f i j. Plan hash f i j → Boolean
 null (Plan pi pj) = Foldable.null pi && Foldable.null pj

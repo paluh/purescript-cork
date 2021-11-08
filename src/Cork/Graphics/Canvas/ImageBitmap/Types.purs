@@ -13,7 +13,6 @@ import Cork.Web.HTML.HTMLLoadedImageElement (HTMLLoadedImageElement(..), Source(
 import Cork.Web.HTML.HTMLLoadedImageElement (Source, clone, naturalDimensions, new, setHeight, setWidth, toHTMLElement) as HTMLLoadedImageElement
 import Data.Maybe (Maybe(..))
 import Data.Nullable (Nullable, toMaybe)
-import Debug.Trace (traceM)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)

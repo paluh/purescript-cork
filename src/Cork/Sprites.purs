@@ -19,6 +19,7 @@ import Cork.Sprites.Caches (Cache, Caches, imageBitmapL, imageDataL)
 import Cork.Sprites.Caches.Machine (Change(..), Draw, Draws)
 import Cork.Sprites.Caches.Machine (Change(..), drawImage, drawImageData, drawImagePerspective, drawImageScale, Draw, Draws, putImageData) as Exports
 import Cork.Sprites.Caches.Machine (machine) as Caches.Machine
+import Cork.Sprites.Caches.Types (empty) as Caches
 import Data.Array (catMaybes)
 import Data.Bitraversable (bitraverse)
 import Data.Either (Either(..))
@@ -28,7 +29,6 @@ import Data.Lens (Lens', set)
 import Data.Lens.Record (prop)
 import Data.Map (lookup) as Map
 import Data.Maybe (Maybe(..))
-import Debug.Trace (traceM)
 import Effect (Effect)
 import Graphics.Canvas (ImageData)
 import Record (insert) as Record
@@ -143,7 +143,12 @@ machine config = do
       , subs: const mempty
       , update
       , init:
-        { model: Record.insert (SProxy ∷ SProxy "dimensions") config.dimensions mempty
+        { model:
+          { caches: Caches.empty
+          , dimensions: config.dimensions
+          , done: mempty
+          , scene: mempty
+          }
         , effects: mempty
         }
       }
@@ -152,12 +157,12 @@ machine config = do
 
   void $ cachesMachine.subscribe case _ of
     ImageDataChange change → do
-      traceM "Received: ImageDataChange"
+      -- traceM "Received: ImageDataChange"
       i.push (SetImageDataCache change.cache)
       i.run
 
     ImageBitmapChange change → do
-      traceM "Received: ImageBitmapChange"
+      -- traceM "Received: ImageBitmapChange"
       i.push (SetImageBitmapCache change.cache)
       i.run
 

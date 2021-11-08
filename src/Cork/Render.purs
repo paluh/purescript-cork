@@ -29,7 +29,6 @@ import Data.Monoid.Additive (Additive(..))
 import Data.Newtype (un) as Newtype
 import Data.Newtype (wrap)
 import Data.Tuple.Nested ((/\))
-import Debug.Trace (traceM)
 import Effect (Effect)
 import Geometry.Plane (Point(..), Vector(..))
 import Geometry.Plane.BoundingBox.Dimensions (toNumbers) as Dimensions

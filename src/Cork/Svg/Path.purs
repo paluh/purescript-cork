@@ -10,6 +10,10 @@ import Geometry.Angle (toDegrees) as Angle
 import Geometry.Distance (toNumber) as Distance
 import Geometry.Line.Point (Point(..)) as Line
 import Geometry.Plane (Point(..))
+import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty (uncons) as Array.NonEmpty
+import Data.Foldable (foldr)
+import Data.List (List(..)) as List
 
 -- | Path definition which can be used by both
 -- | Svg and Canvas.Path2d.
@@ -136,3 +140,12 @@ print =
 
 unRepr ∷ Repr → String
 unRepr (Repr s) = s
+
+
+fromPoints :: forall u. NonEmptyArray (Point u) -> Path u
+fromPoints points =
+  let
+    { head, tail } = Array.NonEmpty.uncons points
+    step pnt pth = List.Cons (LineAbs pnt) pth
+  in
+    List.Cons (MoveAbs head) $ foldr step (List.Cons Close List.Nil) points

@@ -1,5 +1,6 @@
 module Cork.Sprites.Caches.Types where
 
+import Control.Plus (empty) as Plus
 import Cork.Graphics.Canvas.ImageBitmap (ImageBitmap)
 import Data.Either (Either)
 import Data.Lens (Lens')
@@ -18,6 +19,11 @@ type Caches =
   { imageData ∷ Cache ImageData
   , imageBitmap ∷ Cache ImageBitmap
   }
+
+-- | Till `Map` `Monoid` instance is back it
+-- | is convenient to use this value
+empty ∷ Caches
+empty = { imageData: Plus.empty, imageBitmap: Plus.empty }
 
 _imageData = SProxy ∷ SProxy "imageData"
 

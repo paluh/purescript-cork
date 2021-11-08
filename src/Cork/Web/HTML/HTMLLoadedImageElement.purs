@@ -4,8 +4,8 @@ import Prelude
 
 import Cork.Graphics.Canvas.CanvasElement (new) as CanvasElement
 import Data.Argonaut (class DecodeJson, class EncodeJson)
-import Data.Argonaut.Decode.Generic.Rep (genericDecodeJson)
-import Data.Argonaut.Encode.Generic.Rep (genericEncodeJson)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Hashable (class Hashable, hash)
 import Data.Maybe (fromJust)

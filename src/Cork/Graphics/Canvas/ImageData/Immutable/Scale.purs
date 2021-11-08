@@ -4,7 +4,6 @@ import Prelude
 
 -- import Cork.Graphics.Canvas.CanvasElement (minCanvasPhysicalDimensions)
 import Data.Int (toNumber) as Int
-import Debug.Trace (traceM)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Geometry.Distance (toNumber) as Distance
